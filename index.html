@@ -621,22 +621,28 @@
           <label>Firebase Realtime DB URL (Optional)</label>
           <input class="input" id="syncFirebaseUrl" placeholder="https://your-project-default-rtdb.firebaseio.com" />
         </div>
-        <div class="row-2">
+        <div class="row-2" style="margin-bottom:8px;">
           <button class="btn btn-primary" onclick="saveSyncSettings()">Connect & Sync</button>
           <button class="btn" onclick="copyInviteLink()">Copy Room Link</button>
         </div>
+        <div class="row-2">
+          <button class="btn btn-sm" onclick="pullFromCloud(true)">⬇ Pull From Cloud</button>
+          <button class="btn btn-sm" onclick="forcePushToCloud()">⬆ Force Push Local</button>
+        </div>
       </div>
 
-      <div class="row-2">
+      <div class="row-2" style="margin-bottom:8px;">
         <button class="btn btn-sm" onclick="exportBackup()">⬇ Export JSON</button>
         <button class="btn btn-sm" onclick="importBackupPrompt()">⬆ Import JSON</button>
       </div>
+      <button class="btn btn-sm" style="width:100%;" onclick="restoreSnapshot()">⏪ Restore Last Snapshot</button>
     </div>
   </div>
 
   <script>
     const EMOJIS = ["🎲","♟️","🏰","🐉","🚂","🌿","🦊","💎","⚔️","🃏","🧩","🏝️","🚀","🏛️","🎨","🐝","🌊","🍄","👑","🎯"];
     const STORAGE_KEY = "tabletop_rivalry_v4";
+    const BACKUP_KEY = "tabletop_rivalry_backup_v6";
 
     const now = new Date();
     const ym = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -671,6 +677,7 @@
     let selectedWinner = "p1";
     let pickedEmoji = "🎲";
     let syncTimer = null;
+    let initialSyncDone = false;
 
     function loadState() {
       try {
@@ -683,9 +690,36 @@
       return JSON.parse(JSON.stringify(DEFAULT_STATE));
     }
 
+    function saveLocalSnapshot() {
+      try {
+        const current = localStorage.getItem(STORAGE_KEY);
+        if (current) localStorage.setItem(BACKUP_KEY, current);
+      } catch (e) {}
+    }
+
+    function restoreSnapshot() {
+      try {
+        const snap = localStorage.getItem(BACKUP_KEY);
+        if (!snap) return showToast("No snapshot saved yet");
+        const parsed = JSON.parse(snap);
+        state = {
+          ...DEFAULT_STATE,
+          ...parsed,
+          games: Array.isArray(parsed.games) ? parsed.games : DEFAULT_STATE.games,
+          matches: Array.isArray(parsed.matches) ? parsed.matches : [],
+          sync: { ...DEFAULT_STATE.sync, ...(parsed.sync || {}), ...state.sync }
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        render();
+        showToast("Restored last local snapshot!");
+      } catch (e) {
+        showToast("Could not restore snapshot");
+      }
+    }
+
     function saveState(pushCloud = true) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      if (pushCloud && state.sync.firebaseUrl && state.sync.room) {
+      if (pushCloud && initialSyncDone && state.sync.firebaseUrl && state.sync.room) {
         pushToCloud();
       }
       render();
@@ -712,8 +746,8 @@
     })();
 
     async function pushToCloud() {
-      const base = state.sync.firebaseUrl.replace(/\/$/, "");
-      if (!base) return;
+      const base = (state.sync.firebaseUrl || "").replace(/\/$/, "");
+      if (!base || !state.sync.room) return;
       try {
         await fetch(`${base}/rivalry/${encodeURIComponent(state.sync.room)}.json`, {
           method: "PUT",
@@ -728,30 +762,52 @@
       } catch (e) {}
     }
 
+    async function forcePushToCloud() {
+      if (!state.sync.firebaseUrl || !state.sync.room) {
+        return showToast("Enter a Firebase URL and Room Code first");
+      }
+      if (!confirm("Overwrite cloud database with the data currently on this screen?")) return;
+      initialSyncDone = true;
+      await pushToCloud();
+      showToast("Pushed local data to cloud!");
+    }
+
     async function pullFromCloud(forceNotify = false) {
       const base = (state.sync.firebaseUrl || "").replace(/\/$/, "");
-      if (!base || !state.sync.room) return;
+      if (!base || !state.sync.room) {
+        initialSyncDone = true;
+        return null;
+      }
       try {
         const res = await fetch(`${base}/rivalry/${encodeURIComponent(state.sync.room)}.json?t=${Date.now()}`);
         const data = await res.json();
         if (data && typeof data === "object") {
+          saveLocalSnapshot();
           if (data.players) state.players = data.players;
           if (Array.isArray(data.games)) state.games = data.games;
           state.matches = Array.isArray(data.matches) ? data.matches : [];
           localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
           render();
           if (forceNotify) showToast("Synced from cloud!");
+        } else if (forceNotify) {
+          showToast("Room is empty in cloud");
         }
+        initialSyncDone = true;
+        return data;
       } catch (e) {
         if (forceNotify) showToast("Sync error — check Firebase URL");
+        return null;
       }
     }
 
     function startCloudPolling() {
       clearInterval(syncTimer);
       if (state.sync.firebaseUrl) {
-        pullFromCloud();
+        initialSyncDone = false;
+        pullFromCloud(false);
         syncTimer = setInterval(() => pullFromCloud(false), 5000);
+      } else {
+        initialSyncDone = true;
       }
     }
 
@@ -1205,9 +1261,18 @@ ${narrative}`;
     async function saveSyncSettings() {
       state.sync.room = (document.getElementById("syncRoomInput").value.trim() || state.sync.room).toUpperCase();
       state.sync.firebaseUrl = document.getElementById("syncFirebaseUrl").value.trim();
+      initialSyncDone = false;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      await pullFromCloud(true);
-      await pushToCloud();
+      const existing = await pullFromCloud(false);
+      if (!existing && state.sync.firebaseUrl) {
+        await pushToCloud();
+        showToast("Connected & initialized cloud room!");
+      } else if (existing) {
+        showToast("Connected & loaded cloud room!");
+      } else {
+        showToast("Sync settings saved!");
+      }
+      initialSyncDone = true;
       startCloudPolling();
       closeModal("syncModal");
     }
