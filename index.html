@@ -609,19 +609,646 @@
       </div>
 
       <div class="summary-box">
-        <label style="font-size:12px; color:var(--text-muted); font-weight:700;">LIVE CLOUD SYNC (FIREBASE URL)</label>
+        <label style="font-size:12px; color:var(--text-muted); font-weight:700;">LIVE CLOUD SYNC (OPTIONAL FIREBASE URL)</label>
         <p style="font-size:12px; color:var(--text-muted); margin:6px 0 10px;">
-          Paste your Firebase Realtime Database URL and use the exact same Room Code on both iPhones to sync every match, game, and player name automatically.
+          Paste a free Firebase Realtime Database URL (e.g. <code>https://your-app.firebaseio.com</code>) and use the same Room Code on both iPhones to sync every match automatically in real time.
         </p>
         <div class="field">
           <label>Shared Room Code</label>
           <input class="input" id="syncRoomInput" placeholder="e.g. MEEPLE-2026" />
         </div>
         <div class="field">
-          <label>Firebase Realtime DB URL</label>
+          <label>Firebase Realtime DB URL (Optional)</label>
           <input class="input" id="syncFirebaseUrl" placeholder="https://your-project-default-rtdb.firebaseio.com" />
         </div>
         <div class="row-2">
           <button class="btn btn-primary" onclick="saveSyncSettings()">Connect & Sync</button>
           <button class="btn" onclick="copyInviteLink()">Copy Room Link</button>
         </div>
+      </div>
+
+      <div class="row-2">
+        <button class="btn btn-sm" onclick="exportBackup()">⬇ Export JSON</button>
+        <button class="btn btn-sm" onclick="importBackupPrompt()">⬆ Import JSON</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const EMOJIS = ["🎲","♟️","🏰","🐉","🚂","🌿","🦊","💎","⚔️","🃏","🧩","🏝️","🚀","🏛️","🎨","🐝","🌊","🍄","👑","🎯"];
+    const STORAGE_KEY = "tabletop_rivalry_v4";
+
+    const now = new Date();
+    const ym = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 15);
+    const curYM = ym(now);
+    const prevYM = ym(prevDate);
+
+    const DEFAULT_STATE = {
+      players: {
+        p1: { name: "Me", avatar: "🧔‍♂️" },
+        p2: { name: "Girlfriend", avatar: "👩" }
+      },
+      games: [
+        { id: "g1", name: "Wingspan", icon: "🦅", category: "Engine Building • 45m" },
+        { id: "g2", name: "Azul", icon: "💎", category: "Tile Drafting • 35m" },
+        { id: "g3", name: "Patchwork", icon: "🧩", category: "2-Player Puzzle • 30m" },
+        { id: "g4", name: "Ticket to Ride", icon: "🚂", category: "Route Building • 45m" },
+        { id: "g5", name: "Codenames Duet", icon: "🕵️", category: "Co-op Word • 25m" },
+        { id: "g6", name: "7 Wonders Duel", icon: "🏛️", category: "Civilization • 30m" },
+        { id: "g7", name: "Cascadia", icon: "🦊", category: "Habitat Puzzle • 35m" }
+      ],
+      matches: [],
+      sync: {
+        room: "MEEPLE-" + Math.floor(1000 + Math.random() * 9000),
+        firebaseUrl: ""
+      }
+    };
+
+    let state = loadState();
+    let selectedMonth = curYM;
+    let gameFilter = "all";
+    let selectedWinner = "p1";
+    let pickedEmoji = "🎲";
+    let syncTimer = null;
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          return { ...DEFAULT_STATE, ...parsed };
+        }
+      } catch (e) {}
+      return JSON.parse(JSON.stringify(DEFAULT_STATE));
+    }
+
+    function saveState(pushCloud = true) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      if (pushCloud && state.sync.firebaseUrl && state.sync.room) {
+        pushToCloud();
+      }
+      render();
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.style.display = "block";
+      clearTimeout(t._timer);
+      t._timer = setTimeout(() => { t.style.display = "none"; }, 2600);
+    }
+
+    // URL Room Param Support
+    (function checkUrlParams() {
+      const params = new URLSearchParams(window.location.search);
+      const r = params.get("room");
+      const fb = params.get("fb");
+      if (r) state.sync.room = r.toUpperCase();
+      if (fb) state.sync.firebaseUrl = fb;
+      if (r || fb) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      }
+    })();
+
+    async function pushToCloud() {
+      const base = state.sync.firebaseUrl.replace(/\/$/, "");
+      if (!base) return;
+      try {
+        await fetch(`${base}/rivalry/${encodeURIComponent(state.sync.room)}.json`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            players: state.players,
+            games: state.games,
+            matches: state.matches,
+            updatedAt: Date.now()
+          })
+        });
+      } catch (e) {}
+    }
+
+    async function pullFromCloud() {
+      const base = state.sync.firebaseUrl.replace(/\/$/, "");
+      if (!base || !state.sync.room) return;
+      try {
+        const res = await fetch(`${base}/rivalry/${encodeURIComponent(state.sync.room)}.json`);
+        const data = await res.json();
+        if (data && data.games && data.matches) {
+          state.players = data.players || state.players;
+          state.games = data.games;
+          state.matches = data.matches;
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+          render();
+        }
+      } catch (e) {}
+    }
+
+    function startCloudPolling() {
+      clearInterval(syncTimer);
+      if (state.sync.firebaseUrl) {
+        pullFromCloud();
+        syncTimer = setInterval(pullFromCloud, 5000);
+      }
+    }
+
+    function formatMonthLabel(ymStr) {
+      const [y, m] = ymStr.split("-").map(Number);
+      return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+    }
+
+    function changeMonth(delta) {
+      const [y, m] = selectedMonth.split("-").map(Number);
+      const d = new Date(y, m - 1 + delta, 1);
+      selectedMonth = ym(d);
+      render();
+    }
+
+    function setGameFilter(f) {
+      gameFilter = f;
+      document.getElementById("tabAll").classList.toggle("active", f === "all");
+      document.getElementById("tabActive").classList.toggle("active", f === "played");
+      render();
+    }
+
+    function getMonthMatches(ymStr) {
+      return state.matches
+        .filter(m => m.date && m.date.startsWith(ymStr))
+        .sort((a, b) => b.date.localeCompare(a.date));
+    }
+
+    function computeAllTimeCrowns() {
+      const months = [...new Set(state.matches.map(m => m.date.slice(0, 7)))];
+      let c1 = 0, c2 = 0;
+      months.forEach(m => {
+        if (m === curYM) return;
+        const ms = getMonthMatches(m);
+        const w1 = ms.filter(x => x.winner === "p1").length;
+        const w2 = ms.filter(x => x.winner === "p2").length;
+        if (w1 > w2) c1++;
+        else if (w2 > w1) c2++;
+      });
+      return { c1, c2 };
+    }
+
+    function render() {
+      const p1 = state.players.p1;
+      const p2 = state.players.p2;
+      const monthMatches = getMonthMatches(selectedMonth);
+
+      document.getElementById("roomCodeBadge").textContent = state.sync.firebaseUrl
+        ? `Live • ${state.sync.room}`
+        : `Room ${state.sync.room}`;
+
+      document.getElementById("currentMonthLabel").textContent = formatMonthLabel(selectedMonth);
+      document.getElementById("logMonthName").textContent = formatMonthLabel(selectedMonth);
+      document.getElementById("monthSubtitle").textContent = `${monthMatches.length} match${monthMatches.length === 1 ? "" : "es"} logged`;
+
+      document.getElementById("p1Avatar").textContent = p1.avatar;
+      document.getElementById("p1Name").textContent = p1.name;
+      document.getElementById("p2Avatar").textContent = p2.avatar;
+      document.getElementById("p2Name").textContent = p2.name;
+
+      const w1 = monthMatches.filter(m => m.winner === "p1").length;
+      const w2 = monthMatches.filter(m => m.winner === "p2").length;
+      const ties = monthMatches.filter(m => m.winner === "tie").length;
+      const total = monthMatches.length;
+
+      document.getElementById("p1MonthWins").textContent = w1;
+      document.getElementById("p2MonthWins").textContent = w2;
+      document.getElementById("tiesBadge").textContent = `${ties} Tie${ties === 1 ? "" : "s"}`;
+      document.getElementById("p1WinPct").textContent = total ? `${Math.round((w1 / total) * 100)}% win rate` : "0% win rate";
+      document.getElementById("p2WinPct").textContent = total ? `${Math.round((w2 / total) * 100)}% win rate` : "0% win rate";
+
+      if (w1 > w2) document.getElementById("tugLeadText").textContent = `${p1.name} leads by ${w1 - w2}`;
+      else if (w2 > w1) document.getElementById("tugLeadText").textContent = `${p2.name} leads by ${w2 - w1}`;
+      else document.getElementById("tugLeadText").textContent = "Tied Monthly Rally";
+
+      const crowns = computeAllTimeCrowns();
+      document.getElementById("allTimeCrownText").textContent = `Monthly Crowns: ${crowns.c1} – ${crowns.c2}`;
+
+      if (total === 0) {
+        document.getElementById("tugP1").style.width = "50%";
+        document.getElementById("tugTie").style.width = "0%";
+        document.getElementById("tugP2").style.width = "50%";
+      } else {
+        document.getElementById("tugP1").style.width = `${(w1 / total) * 100}%`;
+        document.getElementById("tugTie").style.width = `${(ties / total) * 100}%`;
+        document.getElementById("tugP2").style.width = `${(w2 / total) * 100}%`;
+      }
+
+      // Active Streak
+      let streakStr = "—";
+      const decisive = monthMatches.filter(m => m.winner !== "tie");
+      if (decisive.length > 0) {
+        const who = decisive[0].winner;
+        let count = 0;
+        for (const m of decisive) {
+          if (m.winner === who) count++;
+          else break;
+        }
+        streakStr = `${who === "p1" ? p1.name : p2.name} (${count}W)`;
+      }
+      document.getElementById("statStreak").textContent = streakStr;
+
+      // Top Game
+      const counts = {};
+      monthMatches.forEach(m => { counts[m.gameId] = (counts[m.gameId] || 0) + 1; });
+      const topEntry = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+      const topGame = topEntry ? state.games.find(g => g.id === topEntry[0]) : null;
+      document.getElementById("statTopGame").textContent = topGame ? `${topGame.icon} ${topGame.name}` : "—";
+
+      const allW1 = state.matches.filter(m => m.winner === "p1").length;
+      const allW2 = state.matches.filter(m => m.winner === "p2").length;
+      document.getElementById("statAllTime").textContent = `${allW1} – ${allW2}`;
+
+      // Per-Game Rallies Grid
+      document.getElementById("tabAll").textContent = `All Shelf (${state.games.length})`;
+      const grid = document.getElementById("gamesGrid");
+      grid.innerHTML = "";
+
+      state.games.forEach(game => {
+        const gMatches = monthMatches.filter(m => m.gameId === game.id);
+        if (gameFilter === "played" && gMatches.length === 0) return;
+
+        const gw1 = gMatches.filter(m => m.winner === "p1").length;
+        const gw2 = gMatches.filter(m => m.winner === "p2").length;
+        const gTotal = gMatches.length;
+        const p1Pct = gTotal ? (gw1 / gTotal) * 100 : 50;
+        const p2Pct = gTotal ? (gw2 / gTotal) * 100 : 50;
+
+        let leaderLabel = gTotal === 0 ? "" : (gw1 > gw2 ? `${p1.name} +${gw1 - gw2}` : gw2 > gw1 ? `${p2.name} +${gw2 - gw1}` : "Tied");
+
+        const recent5 = gMatches.slice(0, 5).reverse().map(m => {
+          const lbl = m.winner === "p1" ? p1.name[0] : m.winner === "p2" ? p2.name[0] : "T";
+          return `<span class="fdot ${m.winner}">${lbl}</span>`;
+        }).join("");
+
+        const card = document.createElement("div");
+        card.className = "game-card";
+        card.onclick = () => openLogModal(game.id);
+        card.innerHTML = `
+          <div>
+            <div class="game-top">
+              <div class="game-info">
+                <div class="game-emoji">${game.icon}</div>
+                <div style="min-width:0;">
+                  <div class="game-title">${game.name}</div>
+                  <div class="game-sub">${game.category || "Board Game"}</div>
+                </div>
+              </div>
+            </div>
+            <div class="game-scoreline" style="margin-top:10px;">
+              <span class="c-p1">${p1.name} ${gw1}</span>
+              <span class="c-muted">${leaderLabel}</span>
+              <span class="c-p2">${gw2} ${p2.name}</span>
+            </div>
+            <div class="mini-tug" style="margin-top:8px;">
+              <div class="tug-p1" style="width:${p1Pct}%"></div>
+              <div class="tug-p2" style="width:${p2Pct}%"></div>
+            </div>
+          </div>
+          <div class="game-foot">
+            <div class="form-dots">${recent5 || '<span class="game-sub">No plays yet</span>'}</div>
+            <span class="game-sub">${gTotal} play${gTotal === 1 ? "" : "s"}</span>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+
+      const addCard = document.createElement("div");
+      addCard.className = "add-game-card";
+      addCard.onclick = () => openModal("addGameModal");
+      addCard.innerHTML = `<div style="font-size:26px;">＋</div><div>Add New Board Game</div>`;
+      grid.appendChild(addCard);
+
+      // Match Log
+      const logBox = document.getElementById("matchHistoryList");
+      if (monthMatches.length === 0) {
+        logBox.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:16px 0;">No matches logged in ${formatMonthLabel(selectedMonth)} yet. Tap <strong>+ Log Match</strong> below!</div>`;
+      } else {
+        logBox.innerHTML = monthMatches.map(m => {
+          const g = state.games.find(x => x.id === m.gameId) || { name: "Board Game", icon: "🎲" };
+          const winText = m.winner === "p1" ? `${p1.avatar} ${p1.name} Won` : m.winner === "p2" ? `${p2.avatar} ${p2.name} Won` : "🤝 Tie Game";
+          const scoreStr = (m.p1Score !== null && m.p2Score !== null) ? ` • ${m.p1Score}–${m.p2Score}` : "";
+          const noteStr = m.note ? ` • “${m.note}”` : "";
+          return `
+            <div class="match-item">
+              <div class="match-left">
+                <div class="game-emoji">${g.icon}</div>
+                <div>
+                  <div style="font-weight:700; font-size:14px;">${g.name}</div>
+                  <div class="match-meta">${m.date}${scoreStr}${noteStr}</div>
+                </div>
+              </div>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span class="badge ${m.winner}">${winText}</span>
+                <button class="btn btn-sm btn-danger" onclick="deleteMatch('${m.id}')" title="Delete">✕</button>
+              </div>
+            </div>
+          `;
+        }).join("");
+      }
+    }
+
+    // Modal Helpers
+    function openModal(id) {
+      if (id === "addGameModal") renderAddGameModal();
+      if (id === "summaryModal") renderSummaryModal();
+      if (id === "playersModal") {
+        document.getElementById("editP1Name").value = state.players.p1.name;
+        document.getElementById("editP1Avatar").value = state.players.p1.avatar;
+        document.getElementById("editP2Name").value = state.players.p2.name;
+        document.getElementById("editP2Avatar").value = state.players.p2.avatar;
+      }
+      if (id === "syncModal") {
+        document.getElementById("syncRoomInput").value = state.sync.room;
+        document.getElementById("syncFirebaseUrl").value = state.sync.firebaseUrl || "";
+      }
+      document.getElementById(id).classList.add("open");
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.remove("open");
+    }
+
+    function openLogModal(preselectGameId) {
+      const sel = document.getElementById("matchGameSelect");
+      sel.innerHTML = state.games.length
+        ? state.games.map(g => `<option value="${g.id}">${g.icon} ${g.name}</option>`).join("")
+        : `<option value="">— Add a new game below —</option>`;
+      if (preselectGameId) sel.value = preselectGameId;
+
+      document.getElementById("quickNewGameBox").style.display = "none";
+      document.getElementById("quickGameName").value = "";
+      document.getElementById("winBtnP1").textContent = `${state.players.p1.avatar} ${state.players.p1.name}`;
+      document.getElementById("winBtnP2").textContent = `${state.players.p2.avatar} ${state.players.p2.name}`;
+      document.getElementById("scoreP1Label").textContent = `${state.players.p1.name} Score (Opt.)`;
+      document.getElementById("scoreP2Label").textContent = `${state.players.p2.name} Score (Opt.)`;
+      document.getElementById("scoreP1").value = "";
+      document.getElementById("scoreP2").value = "";
+      document.getElementById("matchNote").value = "";
+      document.getElementById("matchDate").value = new Date().toISOString().slice(0, 10);
+      selectWinner("p1");
+      openModal("logModal");
+    }
+
+    function toggleQuickAddGame() {
+      const box = document.getElementById("quickNewGameBox");
+      box.style.display = box.style.display === "none" ? "block" : "none";
+    }
+
+    function selectWinner(w) {
+      selectedWinner = w;
+      document.getElementById("winBtnP1").className = "wpill" + (w === "p1" ? " sel-p1" : "");
+      document.getElementById("winBtnTie").className = "wpill" + (w === "tie" ? " sel-tie" : "");
+      document.getElementById("winBtnP2").className = "wpill" + (w === "p2" ? " sel-p2" : "");
+    }
+
+    function saveMatch() {
+      let gameId = document.getElementById("matchGameSelect").value;
+      const quickName = document.getElementById("quickGameName").value.trim();
+      if (!gameId && !quickName) {
+        document.getElementById("quickNewGameBox").style.display = "block";
+        return showToast("Enter a board game name first");
+      }
+      if (document.getElementById("quickNewGameBox").style.display !== "none" && quickName) {
+        const newId = "g" + Date.now();
+        state.games.push({
+          id: newId,
+          name: quickName,
+          icon: document.getElementById("quickGameIcon").value.trim() || "🎲",
+          category: "Custom Game"
+        });
+        gameId = newId;
+      }
+
+      const s1Raw = document.getElementById("scoreP1").value;
+      const s2Raw = document.getElementById("scoreP2").value;
+      const dateVal = document.getElementById("matchDate").value || new Date().toISOString().slice(0, 10);
+
+      state.matches.push({
+        id: "m" + Date.now(),
+        gameId,
+        winner: selectedWinner,
+        p1Score: s1Raw === "" ? null : Number(s1Raw),
+        p2Score: s2Raw === "" ? null : Number(s2Raw),
+        date: dateVal,
+        note: document.getElementById("matchNote").value.trim()
+      });
+
+      selectedMonth = dateVal.slice(0, 7);
+      saveState();
+      closeModal("logModal");
+      showToast("Match logged!");
+    }
+
+    function deleteMatch(id) {
+      state.matches = state.matches.filter(m => m.id !== id);
+      saveState();
+      showToast("Match removed");
+    }
+
+    function renderAddGameModal() {
+      const picker = document.getElementById("emojiPicker");
+      picker.innerHTML = EMOJIS.map(e => `<button type="button" class="epick ${e === pickedEmoji ? "active" : ""}" onclick="pickEmoji('${e}')">${e}</button>`).join("");
+
+      const list = document.getElementById("shelfManageList");
+      if (state.games.length === 0) {
+        list.innerHTML = `<div class="match-meta" style="padding:10px 0;">Your shelf is empty. Add your favorite board games above!</div>`;
+        return;
+      }
+      list.innerHTML = state.games.map(g => {
+        const count = state.matches.filter(m => m.gameId === g.id).length;
+        return `
+          <div class="match-item">
+            <div class="match-left">
+              <div class="game-emoji">${g.icon}</div>
+              <div>
+                <div style="font-weight:700; font-size:14px;">${g.name}</div>
+                <div class="match-meta">${g.category || "Board Game"} • ${count} match${count === 1 ? "" : "es"}</div>
+              </div>
+            </div>
+            <button class="btn btn-sm btn-danger" onclick="removeGame('${g.id}')">Remove</button>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function pickEmoji(e) {
+      pickedEmoji = e;
+      renderAddGameModal();
+    }
+
+    function addNewGame() {
+      const name = document.getElementById("newGameName").value.trim();
+      if (!name) return showToast("Enter a board game name");
+      if (state.games.some(g => g.name.toLowerCase() === name.toLowerCase())) {
+        return showToast("That game is already on your shelf!");
+      }
+      state.games.push({
+        id: "g" + Date.now(),
+        name,
+        icon: pickedEmoji,
+        category: document.getElementById("newGameCat").value.trim() || "Board Game"
+      });
+      document.getElementById("newGameName").value = "";
+      document.getElementById("newGameCat").value = "";
+      saveState();
+      renderAddGameModal();
+      showToast(`${pickedEmoji} ${name} added!`);
+    }
+
+    function confirmRemoveGame(id) {
+      const g = state.games.find(x => x.id === id);
+      if (!g) return;
+      const count = state.matches.filter(m => m.gameId === id).length;
+      const msg = count > 0
+        ? `Delete "${g.name}" from your shelf? (${count} past match${count === 1 ? "" : "es"} will remain in your monthly log.)`
+        : `Delete "${g.name}" from your shelf?`;
+      if (confirm(msg)) {
+        removeGame(id);
+      }
+    }
+
+    function removeGame(id) {
+      const g = state.games.find(x => x.id === id);
+      state.games = state.games.filter(x => x.id !== id);
+      saveState();
+      if (document.getElementById("addGameModal").classList.contains("open")) {
+        renderAddGameModal();
+      }
+      showToast(g ? `Deleted ${g.name}` : "Removed from shelf");
+    }
+
+    function removeUnplayedGames() {
+      const unplayed = state.games.filter(g => !state.matches.some(m => m.gameId === g.id));
+      if (unplayed.length === 0) return showToast("All shelf games have logged matches!");
+      if (confirm(`Remove ${unplayed.length} unplayed game${unplayed.length === 1 ? "" : "s"} from your shelf?`)) {
+        const playedIds = new Set(state.matches.map(m => m.gameId));
+        state.games = state.games.filter(g => playedIds.has(g.id));
+        saveState();
+        renderAddGameModal();
+        showToast(`Removed ${unplayed.length} unplayed game${unplayed.length === 1 ? "" : "s"}`);
+      }
+    }
+
+    function savePlayers() {
+      state.players.p1.name = document.getElementById("editP1Name").value.trim() || "Me";
+      state.players.p1.avatar = document.getElementById("editP1Avatar").value.trim() || "🧔‍♂️";
+      state.players.p2.name = document.getElementById("editP2Name").value.trim() || "Girlfriend";
+      state.players.p2.avatar = document.getElementById("editP2Avatar").value.trim() || "👩";
+      saveState();
+      closeModal("playersModal");
+      showToast("Players updated!");
+    }
+
+    let lastRecapText = "";
+    function renderSummaryModal() {
+      const p1 = state.players.p1;
+      const p2 = state.players.p2;
+      const ms = getMonthMatches(selectedMonth);
+      const label = formatMonthLabel(selectedMonth);
+      document.getElementById("sumModalTitle").textContent = `${label} Summary`;
+
+      const w1 = ms.filter(m => m.winner === "p1").length;
+      const w2 = ms.filter(m => m.winner === "p2").length;
+      const ties = ms.filter(m => m.winner === "tie").length;
+
+      let champTitle = "🤝 Co-Champions (Tied Month)";
+      let narrative = `Across ${ms.length} matches in ${label}, ${p1.name} and ${p2.name} battled to an exact ${w1}–${w2} stalemate.`;
+      if (w1 > w2) {
+        champTitle = `👑 ${p1.avatar} ${p1.name} — Monthly Champion`;
+        narrative = `${p1.name} claimed the ${label} crown with a ${w1}–${w2}${ties ? ` (${ties} ties)` : ""} rally victory over ${p2.name}.`;
+      } else if (w2 > w1) {
+        champTitle = `👑 ${p2.avatar} ${p2.name} — Monthly Champion`;
+        narrative = `${p2.name} claimed the ${label} crown with a ${w2}–${w1}${ties ? ` (${ties} ties)` : ""} rally victory over ${p1.name}.`;
+      }
+
+      const breakdownRows = state.games.map(g => {
+        const gm = ms.filter(m => m.gameId === g.id);
+        if (!gm.length) return "";
+        const gw1 = gm.filter(m => m.winner === "p1").length;
+        const gw2 = gm.filter(m => m.winner === "p2").length;
+        const gWinner = gw1 > gw2 ? p1.name : gw2 > gw1 ? p2.name : "Tied";
+        return `<div class="match-item" style="padding:8px 0;">
+          <span>${g.icon} <strong>${g.name}</strong></span>
+          <span class="match-meta">${gw1}–${gw2} (${gWinner})</span>
+        </div>`;
+      }).filter(Boolean).join("");
+
+      lastRecapText = `🎲 Tabletop Rivalry — ${label} Recap
+${champTitle}
+Overall Rally: ${p1.name} ${w1} – ${w2} ${p2.name}
+${narrative}`;
+
+      document.getElementById("summaryContent").innerHTML = `
+        <div class="crown-banner">
+          <div style="font-size:20px; font-weight:900; color:var(--gold);">${champTitle}</div>
+          <div style="font-size:14px; margin-top:6px;">${narrative}</div>
+        </div>
+        <div class="summary-box">
+          <div style="font-size:12px; font-weight:800; color:var(--text-muted); margin-bottom:6px;">PER-GAME RALLY BREAKDOWN</div>
+          ${breakdownRows || '<div class="match-meta">No games played in this month yet.</div>'}
+        </div>
+      `;
+    }
+
+    function copyRecapText() {
+      navigator.clipboard?.writeText(lastRecapText);
+      showToast("Recap copied to clipboard!");
+    }
+
+    function saveSyncSettings() {
+      state.sync.room = (document.getElementById("syncRoomInput").value.trim() || state.sync.room).toUpperCase();
+      state.sync.firebaseUrl = document.getElementById("syncFirebaseUrl").value.trim();
+      saveState();
+      startCloudPolling();
+      closeModal("syncModal");
+      showToast("Sync settings saved!");
+    }
+
+    function copyInviteLink() {
+      const url = new URL(window.location.href);
+      url.searchParams.set("room", state.sync.room);
+      if (state.sync.firebaseUrl) url.searchParams.set("fb", state.sync.firebaseUrl);
+      navigator.clipboard?.writeText(url.toString());
+      showToast("Invite link copied!");
+    }
+
+    function exportBackup() {
+      const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `tabletop-rivalry-${state.sync.room}.json`;
+      a.click();
+    }
+
+    function importBackupPrompt() {
+      const inp = document.createElement("input");
+      inp.type = "file";
+      inp.accept = ".json";
+      inp.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const parsed = JSON.parse(reader.result);
+            state = { ...state, ...parsed };
+            saveState();
+            showToast("Backup imported!");
+          } catch (err) {
+            showToast("Invalid JSON file");
+          }
+        };
+        reader.readAsText(file);
+      };
+      inp.click();
+    }
+
+    startCloudPolling();
+    render();
+  </script>
+</body>
+</html>
