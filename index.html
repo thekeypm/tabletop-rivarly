@@ -363,10 +363,6 @@
           <small>Couples Board Game Rally Tracker</small>
         </div>
       </div>
-      <div class="header-actions">
-        <button class="btn btn-sm" onclick="openModal('summaryModal')">🏆 Month Recap</button>
-        <button class="btn btn-sm" onclick="openModal('playersModal')" title="Settings & Sync">⚙️</button>
-      </div>
     </div>
 
     <!-- Month Selector -->
@@ -440,11 +436,18 @@
     <div class="games-grid" id="gamesGrid"></div>
 
     <!-- Recent Matches This Month -->
-    <div class="section-head">
-      <h3>Match Log (<span id="logMonthName">This Month</span>)</h3>
-      <button class="btn btn-sm" onclick="openModal('summaryModal')">End-of-Month Summary</button>
+    <div id="matchLogSection">
+      <div class="section-head">
+        <h3>Match Log (<span id="logMonthName">This Month</span>)</h3>
+      </div>
+      <div class="card" id="matchHistoryList"></div>
     </div>
-    <div class="card" id="matchHistoryList"></div>
+
+    <!-- Bottom Utility Actions: Month Recap above Settings -->
+    <div style="display:flex; flex-direction:column; gap:10px; margin-top:20px;">
+      <button class="btn" style="width:100%;" onclick="openModal('summaryModal')">🏆 Month Recap</button>
+      <button class="btn" style="width:100%;" onclick="openModal('playersModal')">⚙️ Settings</button>
+    </div>
   </div>
 
   <!-- Sticky Bottom Bar for iPhone -->
@@ -996,11 +999,14 @@
       addCard.innerHTML = `<div style="font-size:26px;">＋</div><div>Add New Board Game</div>`;
       grid.appendChild(addCard);
 
-      // Match Log
+      // Match Log (hidden when no matches have been played)
+      const logSection = document.getElementById("matchLogSection");
       const logBox = document.getElementById("matchHistoryList");
       if (monthMatches.length === 0) {
-        logBox.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:16px 0;">No matches logged in ${formatMonthLabel(selectedMonth)} yet. Tap <strong>+ Log Match</strong> below!</div>`;
+        if (logSection) logSection.style.display = "none";
+        logBox.innerHTML = "";
       } else {
+        if (logSection) logSection.style.display = "block";
         logBox.innerHTML = monthMatches.map(m => {
           const g = state.games.find(x => x.id === m.gameId) || { name: "Board Game", icon: "🎲" };
           const winText = m.winner === "p1" ? `${p1.avatar} ${p1.name} Won` : m.winner === "p2" ? `${p2.avatar} ${p2.name} Won` : "🤝 Tie Game";
