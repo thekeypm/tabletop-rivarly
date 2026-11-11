@@ -364,12 +364,8 @@
         </div>
       </div>
       <div class="header-actions">
-        <button class="sync-pill" onclick="openModal('syncModal')" title="Sync & iPhone Setup">
-          <span class="dot"></span>
-          <span id="roomCodeBadge">Room Sync</span>
-        </button>
         <button class="btn btn-sm" onclick="openModal('summaryModal')">🏆 Month Recap</button>
-        <button class="btn btn-sm" onclick="openModal('playersModal')">⚙️</button>
+        <button class="btn btn-sm" onclick="openModal('playersModal')" title="Settings & Sync">⚙️</button>
       </div>
     </div>
 
@@ -519,12 +515,13 @@
   <div class="modal-backdrop" id="addGameModal">
     <div class="modal">
       <div class="modal-head">
-        <h3>Add & Manage Board Games</h3>
-        <button class="btn btn-sm" onclick="closeModal('addGameModal')">✕</button>
+        <h3 id="gameFormTitle">Add & Manage Board Games</h3>
+        <button class="btn btn-sm" onclick="cancelEditGame(); closeModal('addGameModal')">✕</button>
       </div>
       <div class="field">
-        <label>Pick an Icon</label>
+        <label>Pick an Icon (or type any emoji below)</label>
         <div class="emoji-grid" id="emojiPicker"></div>
+        <input class="input" id="newGameIconInput" value="🎲" maxlength="4" style="max-width:90px; text-align:center; font-size:20px;" oninput="syncEmojiInput(this.value)" />
       </div>
       <div class="row-2">
         <div class="field">
@@ -532,11 +529,14 @@
           <input class="input" id="newGameName" placeholder="e.g. Splendor Duel" />
         </div>
         <div class="field">
-          <label>Category / Vibe</label>
+          <label>Description / Vibe</label>
           <input class="input" id="newGameCat" placeholder="e.g. Strategy • 30m" />
         </div>
       </div>
-      <button class="btn btn-primary" style="width:100%; margin-bottom:16px;" onclick="addNewGame()">Add Game to Shelf</button>
+      <div style="display:flex; gap:8px; margin-bottom:16px;">
+        <button class="btn btn-primary" id="saveGameBtn" style="flex:1;" onclick="saveGameForm()">Add Game to Shelf</button>
+        <button class="btn" id="cancelEditGameBtn" style="display:none;" onclick="cancelEditGame()">Cancel</button>
+      </div>
 
       <div class="field" style="margin-bottom:0;">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
@@ -560,11 +560,11 @@
     </div>
   </div>
 
-  <!-- MODAL: Players Setup -->
+  <!-- MODAL: Players & App Settings -->
   <div class="modal-backdrop" id="playersModal">
     <div class="modal">
       <div class="modal-head">
-        <h3>Customize Players</h3>
+        <h3>⚙️ Settings</h3>
         <button class="btn btn-sm" onclick="closeModal('playersModal')">✕</button>
       </div>
       <div class="row-2">
@@ -587,7 +587,20 @@
           <input class="input" id="editP2Avatar" maxlength="4" />
         </div>
       </div>
-      <button class="btn btn-primary" style="width:100%;" onclick="savePlayers()">Save Players</button>
+      <button class="btn btn-primary" style="width:100%; margin-bottom:16px;" onclick="savePlayers()">Save Players</button>
+
+      <div class="summary-box" style="margin-bottom:0;">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+          <div>
+            <div style="font-size:12px; font-weight:800; color:var(--text-muted);">CLOUD SYNC & SERVER</div>
+            <div style="font-size:13px; margin-top:3px; display:flex; align-items:center; gap:6px; color:var(--green); font-weight:700;">
+              <span class="dot"></span>
+              <span id="roomCodeBadge">Room Sync</span>
+            </div>
+          </div>
+          <button type="button" class="btn btn-sm" onclick="closeModal('playersModal'); openModal('syncModal');">Configure Sync</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -855,9 +868,12 @@
       const p2 = state.players.p2;
       const monthMatches = getMonthMatches(selectedMonth);
 
-      document.getElementById("roomCodeBadge").textContent = state.sync.firebaseUrl
-        ? `Live • ${state.sync.room}`
-        : `Room ${state.sync.room}`;
+      const badgeEl = document.getElementById("roomCodeBadge");
+      if (badgeEl) {
+        badgeEl.textContent = state.sync.firebaseUrl
+          ? `Live • ${state.sync.room}`
+          : `Room ${state.sync.room}`;
+      }
 
       document.getElementById("currentMonthLabel").textContent = formatMonthLabel(selectedMonth);
       document.getElementById("logMonthName").textContent = formatMonthLabel(selectedMonth);
@@ -1108,9 +1124,19 @@
       showToast("Match removed");
     }
 
+    let editingGameId = null;
+
     function renderAddGameModal() {
       const picker = document.getElementById("emojiPicker");
       picker.innerHTML = EMOJIS.map(e => `<button type="button" class="epick ${e === pickedEmoji ? "active" : ""}" onclick="pickEmoji('${e}')">${e}</button>`).join("");
+      const iconInput = document.getElementById("newGameIconInput");
+      if (iconInput && iconInput.value !== pickedEmoji) {
+        iconInput.value = pickedEmoji;
+      }
+
+      document.getElementById("gameFormTitle").textContent = editingGameId ? "Edit Board Game" : "Add & Manage Board Games";
+      document.getElementById("saveGameBtn").textContent = editingGameId ? "Save Game Changes" : "Add Game to Shelf";
+      document.getElementById("cancelEditGameBtn").style.display = editingGameId ? "inline-flex" : "none";
 
       const list = document.getElementById("shelfManageList");
       if (state.games.length === 0) {
@@ -1119,8 +1145,9 @@
       }
       list.innerHTML = state.games.map(g => {
         const count = state.matches.filter(m => m.gameId === g.id).length;
+        const isEditing = g.id === editingGameId;
         return `
-          <div class="match-item">
+          <div class="match-item" style="${isEditing ? 'background:var(--p1-bg); border-radius:10px; padding:10px;' : ''}">
             <div class="match-left">
               <div class="game-emoji">${g.icon}</div>
               <div>
@@ -1128,7 +1155,10 @@
                 <div class="match-meta">${g.category || "Board Game"} • ${count} match${count === 1 ? "" : "es"}</div>
               </div>
             </div>
-            <button class="btn btn-sm btn-danger" onclick="removeGame('${g.id}')">Remove</button>
+            <div style="display:flex; gap:6px;">
+              <button type="button" class="btn btn-sm" onclick="startEditGame('${g.id}')">Edit</button>
+              <button type="button" class="btn btn-sm btn-danger" onclick="removeGame('${g.id}')">Remove</button>
+            </div>
           </div>
         `;
       }).join("");
@@ -1136,26 +1166,94 @@
 
     function pickEmoji(e) {
       pickedEmoji = e;
+      const iconInput = document.getElementById("newGameIconInput");
+      if (iconInput) iconInput.value = e;
       renderAddGameModal();
     }
 
-    function addNewGame() {
+    function syncEmojiInput(val) {
+      const clean = (val || "").trim();
+      if (clean) pickedEmoji = clean;
+      const picker = document.getElementById("emojiPicker");
+      if (picker) {
+        picker.innerHTML = EMOJIS.map(e => `<button type="button" class="epick ${e === pickedEmoji ? "active" : ""}" onclick="pickEmoji('${e}')">${e}</button>`).join("");
+      }
+    }
+
+    function startEditGame(id) {
+      const g = state.games.find(x => x.id === id);
+      if (!g) return;
+      editingGameId = id;
+      pickedEmoji = g.icon || "🎲";
+      document.getElementById("newGameIconInput").value = pickedEmoji;
+      document.getElementById("newGameName").value = g.name;
+      document.getElementById("newGameCat").value = g.category || "";
+      renderAddGameModal();
+      document.getElementById("newGameName").focus();
+    }
+
+    function cancelEditGame() {
+      editingGameId = null;
+      pickedEmoji = "🎲";
+      const iconInput = document.getElementById("newGameIconInput");
+      if (iconInput) iconInput.value = "🎲";
+      const nameInput = document.getElementById("newGameName");
+      if (nameInput) nameInput.value = "";
+      const catInput = document.getElementById("newGameCat");
+      if (catInput) catInput.value = "";
+      if (document.getElementById("addGameModal").classList.contains("open")) {
+        renderAddGameModal();
+      }
+    }
+
+    function saveGameForm() {
       const name = document.getElementById("newGameName").value.trim();
       if (!name) return showToast("Enter a board game name");
+      const iconVal = (document.getElementById("newGameIconInput").value || "").trim() || pickedEmoji || "🎲";
+      const catVal = document.getElementById("newGameCat").value.trim() || "Board Game";
+
+      if (editingGameId) {
+        const idx = state.games.findIndex(g => g.id === editingGameId);
+        if (idx === -1) {
+          cancelEditGame();
+          return;
+        }
+        if (state.games.some(g => g.id !== editingGameId && g.name.toLowerCase() === name.toLowerCase())) {
+          return showToast("Another game already has that title!");
+        }
+        state.games[idx] = {
+          ...state.games[idx],
+          name,
+          icon: iconVal,
+          category: catVal
+        };
+        editingGameId = null;
+        pickedEmoji = "🎲";
+        document.getElementById("newGameIconInput").value = "🎲";
+        document.getElementById("newGameName").value = "";
+        document.getElementById("newGameCat").value = "";
+        saveState();
+        renderAddGameModal();
+        showToast(`${iconVal} ${name} updated!`);
+        return;
+      }
+
       if (state.games.some(g => g.name.toLowerCase() === name.toLowerCase())) {
         return showToast("That game is already on your shelf!");
       }
       state.games.push({
         id: "g" + Date.now(),
         name,
-        icon: pickedEmoji,
-        category: document.getElementById("newGameCat").value.trim() || "Board Game"
+        icon: iconVal,
+        category: catVal
       });
+      pickedEmoji = "🎲";
+      document.getElementById("newGameIconInput").value = "🎲";
       document.getElementById("newGameName").value = "";
       document.getElementById("newGameCat").value = "";
       saveState();
       renderAddGameModal();
-      showToast(`${pickedEmoji} ${name} added!`);
+      showToast(`${iconVal} ${name} added!`);
     }
 
     function confirmRemoveGame(id) {
@@ -1171,6 +1269,7 @@
     }
 
     function removeGame(id) {
+      if (editingGameId === id) editingGameId = null;
       const g = state.games.find(x => x.id === id);
       state.games = state.games.filter(x => x.id !== id);
       saveState();
