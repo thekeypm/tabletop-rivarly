@@ -877,7 +877,7 @@
         const p1Pct = gTotal ? (gw1 / gTotal) * 100 : 50;
         const p2Pct = gTotal ? (gw2 / gTotal) * 100 : 50;
 
-        let leaderLabel = gTotal === 0 ? "Unplayed this month" : (gw1 > gw2 ? `${p1.name} +${gw1 - gw2}` : gw2 > gw1 ? `${p2.name} +${gw2 - gw1}` : "Tied");
+        let leaderLabel = gTotal === 0 ? "" : (gw1 > gw2 ? `${p1.name} +${gw1 - gw2}` : gw2 > gw1 ? `${p2.name} +${gw2 - gw1}` : "Tied");
 
         const recent5 = gMatches.slice(0, 5).reverse().map(m => {
           const lbl = m.winner === "p1" ? p1.name[0] : m.winner === "p2" ? p2.name[0] : "T";
@@ -899,9 +899,9 @@
               </div>
             </div>
             <div class="game-scoreline" style="margin-top:10px;">
-              <span class="c-p1">${p1.name}: ${gw1}</span>
+              <span class="c-p1">${p1.name} ${gw1}</span>
               <span class="c-muted">${leaderLabel}</span>
-              <span class="c-p2">${gw2} :${p2.name}</span>
+              <span class="c-p2">${gw2} ${p2.name}</span>
             </div>
             <div class="mini-tug" style="margin-top:8px;">
               <div class="tug-p1" style="width:${p1Pct}%"></div>
