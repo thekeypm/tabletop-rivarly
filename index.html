@@ -428,9 +428,12 @@
     <!-- Per-Game Monthly Rallies -->
     <div class="section-head">
       <h3>Per-Game Monthly Rallies</h3>
-      <div class="tabs">
-        <button class="tab active" id="tabAll" onclick="setGameFilter('all')">All Shelf (7)</button>
-        <button class="tab" id="tabActive" onclick="setGameFilter('played')">Played This Month</button>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <div class="tabs">
+          <button class="tab active" id="tabAll" onclick="setGameFilter('all')">All Shelf (7)</button>
+          <button class="tab" id="tabActive" onclick="setGameFilter('played')">Played This Month</button>
+        </div>
+        <button class="btn btn-sm" onclick="openModal('addGameModal')">Manage Shelf</button>
       </div>
     </div>
 
@@ -532,7 +535,10 @@
       <button class="btn btn-primary" style="width:100%; margin-bottom:16px;" onclick="addNewGame()">Add Game to Shelf</button>
 
       <div class="field" style="margin-bottom:0;">
-        <label>Current Game Shelf</label>
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+          <label style="margin:0;">Current Game Shelf</label>
+          <button type="button" class="btn btn-sm btn-danger" onclick="removeUnplayedGames()">Remove All Unplayed</button>
+        </div>
         <div id="shelfManageList"></div>
       </div>
     </div>
@@ -626,7 +632,7 @@
 
   <script>
     const EMOJIS = ["🎲","♟️","🏰","🐉","🚂","🌿","🦊","💎","⚔️","🃏","🧩","🏝️","🚀","🏛️","🎨","🐝","🌊","🍄","👑","🎯"];
-    const STORAGE_KEY = "tabletop_rivalry_v3";
+    const STORAGE_KEY = "tabletop_rivalry_v4";
 
     const now = new Date();
     const ym = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -886,7 +892,10 @@
                   <div class="game-sub">${game.category || "Board Game"}</div>
                 </div>
               </div>
-              <button class="btn btn-sm" onclick="openLogModal('${game.id}')">+ Log</button>
+              <div style="display:flex; gap:6px; flex-shrink:0;">
+                <button class="btn btn-sm" onclick="openLogModal('${game.id}')">+ Log</button>
+                <button class="btn btn-sm btn-danger" onclick="confirmRemoveGame('${game.id}')" title="Delete game from shelf" aria-label="Delete ${game.name}">🗑️</button>
+              </div>
             </div>
             <div class="game-scoreline" style="margin-top:10px;">
               <span class="c-p1">${p1.name}: ${gw1}</span>
@@ -964,7 +973,9 @@
 
     function openLogModal(preselectGameId) {
       const sel = document.getElementById("matchGameSelect");
-      sel.innerHTML = state.games.map(g => `<option value="${g.id}">${g.icon} ${g.name}</option>`).join("");
+      sel.innerHTML = state.games.length
+        ? state.games.map(g => `<option value="${g.id}">${g.icon} ${g.name}</option>`).join("")
+        : `<option value="">— Add a new game below —</option>`;
       if (preselectGameId) sel.value = preselectGameId;
 
       document.getElementById("quickNewGameBox").style.display = "none";
@@ -996,6 +1007,10 @@
     function saveMatch() {
       let gameId = document.getElementById("matchGameSelect").value;
       const quickName = document.getElementById("quickGameName").value.trim();
+      if (!gameId && !quickName) {
+        document.getElementById("quickNewGameBox").style.display = "block";
+        return showToast("Enter a board game name first");
+      }
       if (document.getElementById("quickNewGameBox").style.display !== "none" && quickName) {
         const newId = "g" + Date.now();
         state.games.push({
@@ -1038,6 +1053,10 @@
       picker.innerHTML = EMOJIS.map(e => `<button type="button" class="epick ${e === pickedEmoji ? "active" : ""}" onclick="pickEmoji('${e}')">${e}</button>`).join("");
 
       const list = document.getElementById("shelfManageList");
+      if (state.games.length === 0) {
+        list.innerHTML = `<div class="match-meta" style="padding:10px 0;">Your shelf is empty. Add your favorite board games above!</div>`;
+        return;
+      }
       list.innerHTML = state.games.map(g => {
         const count = state.matches.filter(m => m.gameId === g.id).length;
         return `
@@ -1079,12 +1098,38 @@
       showToast(`${pickedEmoji} ${name} added!`);
     }
 
+    function confirmRemoveGame(id) {
+      const g = state.games.find(x => x.id === id);
+      if (!g) return;
+      const count = state.matches.filter(m => m.gameId === id).length;
+      const msg = count > 0
+        ? `Delete "${g.name}" from your shelf? (${count} past match${count === 1 ? "" : "es"} will remain in your monthly log.)`
+        : `Delete "${g.name}" from your shelf?`;
+      if (confirm(msg)) {
+        removeGame(id);
+      }
+    }
+
     function removeGame(id) {
-      if (state.games.length <= 1) return showToast("Keep at least 1 game on your shelf");
-      state.games = state.games.filter(g => g.id !== id);
+      const g = state.games.find(x => x.id === id);
+      state.games = state.games.filter(x => x.id !== id);
       saveState();
-      renderAddGameModal();
-      showToast("Removed from shelf");
+      if (document.getElementById("addGameModal").classList.contains("open")) {
+        renderAddGameModal();
+      }
+      showToast(g ? `Deleted ${g.name}` : "Removed from shelf");
+    }
+
+    function removeUnplayedGames() {
+      const unplayed = state.games.filter(g => !state.matches.some(m => m.gameId === g.id));
+      if (unplayed.length === 0) return showToast("All shelf games have logged matches!");
+      if (confirm(`Remove ${unplayed.length} unplayed game${unplayed.length === 1 ? "" : "s"} from your shelf?`)) {
+        const playedIds = new Set(state.matches.map(m => m.gameId));
+        state.games = state.games.filter(g => playedIds.has(g.id));
+        saveState();
+        renderAddGameModal();
+        showToast(`Removed ${unplayed.length} unplayed game${unplayed.length === 1 ? "" : "s"}`);
+      }
     }
 
     function savePlayers() {
