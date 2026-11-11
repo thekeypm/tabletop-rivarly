@@ -204,7 +204,11 @@
       flex-direction: column;
       justify-content: space-between;
       gap: 10px;
+      cursor: pointer;
+      transition: transform 0.12s ease, border-color 0.15s ease, background 0.15s ease;
     }
+    .game-card:hover { border-color: var(--p1); }
+    .game-card:active { transform: scale(0.98); background: var(--bg-card-2); }
     .game-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     .game-info { display: flex; align-items: center; gap: 10px; min-width: 0; }
     .game-emoji {
@@ -882,6 +886,7 @@
 
         const card = document.createElement("div");
         card.className = "game-card";
+        card.onclick = () => openLogModal(game.id);
         card.innerHTML = `
           <div>
             <div class="game-top">
@@ -891,10 +896,6 @@
                   <div class="game-title">${game.name}</div>
                   <div class="game-sub">${game.category || "Board Game"}</div>
                 </div>
-              </div>
-              <div style="display:flex; gap:6px; flex-shrink:0;">
-                <button class="btn btn-sm" onclick="openLogModal('${game.id}')">+ Log</button>
-                <button class="btn btn-sm btn-danger" onclick="confirmRemoveGame('${game.id}')" title="Delete game from shelf" aria-label="Delete ${game.name}">🗑️</button>
               </div>
             </div>
             <div class="game-scoreline" style="margin-top:10px;">
