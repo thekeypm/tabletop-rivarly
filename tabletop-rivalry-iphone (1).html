@@ -1,0 +1,1208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Rivalry" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>Tabletop Rivalry — Board Game Tracker</title>
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%230f172a'/%3E%3Ctext x='90' y='118' font-size='96' text-anchor='middle'%3E%F0%9F%8E%B2%3C/text%3E%3C/svg%3E" />
+  <style>
+    :root {
+      --bg: #0f172a;
+      --bg-card: #1e293b;
+      --bg-card-2: #162033;
+      --border: #334155;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --p1: #38bdf8;
+      --p1-dark: #0284c7;
+      --p1-bg: rgba(56, 189, 248, 0.14);
+      --p2: #f472b6;
+      --p2-dark: #db2777;
+      --p2-bg: rgba(244, 114, 182, 0.14);
+      --gold: #fbbf24;
+      --green: #34d399;
+      --danger: #f87171;
+      --radius: 16px;
+      --safe-top: env(safe-area-inset-top, 12px);
+      --safe-bottom: env(safe-area-inset-bottom, 20px);
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.45;
+      padding: calc(var(--safe-top) + 12px) 16px calc(var(--safe-bottom) + 84px);
+    }
+
+    .container { max-width: 820px; margin: 0 auto; }
+
+    /* Header */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand-icon {
+      width: 42px; height: 42px; border-radius: 12px;
+      background: linear-gradient(135deg, var(--p1-dark), var(--p2-dark));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; box-shadow: 0 6px 18px rgba(0,0,0,0.3);
+    }
+    .brand h1 { font-size: 19px; margin: 0; font-weight: 800; letter-spacing: -0.02em; }
+    .brand small { display: block; color: var(--text-muted); font-size: 12px; }
+
+    .header-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+    .btn {
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text);
+      padding: 10px 14px;
+      min-height: 44px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: transform 0.1s ease, background 0.15s ease;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary {
+      background: linear-gradient(135deg, #0284c7, #db2777);
+      border: none;
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(219, 39, 119, 0.28);
+    }
+    .btn-sm { min-height: 36px; padding: 6px 11px; font-size: 13px; border-radius: 10px; }
+    .btn-danger { border-color: rgba(248,113,113,0.4); color: var(--danger); }
+
+    .sync-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(52, 211, 153, 0.12);
+      border: 1px solid rgba(52, 211, 153, 0.35);
+      color: var(--green);
+      padding: 8px 12px; min-height: 44px; border-radius: 999px;
+      font-size: 12px; font-weight: 700; cursor: pointer;
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+
+    /* Month Navigator */
+    .month-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 10px 12px; margin-bottom: 16px;
+    }
+    .month-title { text-align: center; }
+    .month-title h2 { margin: 0; font-size: 18px; font-weight: 800; }
+    .month-title span { font-size: 12px; color: var(--text-muted); }
+
+    /* Cards */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+      margin-bottom: 16px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+    }
+
+    /* Overall Rally */
+    .players-row {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 12px;
+      text-align: center;
+    }
+    .player-box {
+      padding: 12px 8px;
+      border-radius: 14px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .player-box.p1 { background: var(--p1-bg); border: 1px solid rgba(56,189,248,0.28); }
+    .player-box.p2 { background: var(--p2-bg); border: 1px solid rgba(244,114,182,0.28); }
+    .avatar { font-size: 30px; line-height: 1.1; }
+    .pname { font-weight: 700; font-size: 15px; margin-top: 4px; }
+    .pscore { font-size: 34px; font-weight: 900; line-height: 1.1; margin-top: 4px; }
+    .p1 .pscore { color: var(--p1); }
+    .p2 .pscore { color: var(--p2); }
+    .pmeta { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+    .vs-badge {
+      font-size: 12px; font-weight: 800; color: var(--text-muted);
+      background: var(--bg); border: 1px solid var(--border);
+      padding: 6px 10px; border-radius: 999px;
+    }
+
+    /* Tug of War */
+    .tug-wrap { margin-top: 16px; }
+    .tug-labels {
+      display: flex; justify-content: space-between;
+      font-size: 12px; color: var(--text-muted); margin-bottom: 6px; font-weight: 600;
+    }
+    .tug-bar {
+      height: 14px; border-radius: 999px; background: var(--bg);
+      overflow: hidden; display: flex; border: 1px solid var(--border);
+    }
+    .tug-p1 { background: linear-gradient(90deg, var(--p1-dark), var(--p1)); transition: width 0.35s ease; }
+    .tug-tie { background: #64748b; transition: width 0.35s ease; }
+    .tug-p2 { background: linear-gradient(90deg, var(--p2), var(--p2-dark)); transition: width 0.35s ease; }
+
+    .stats-strip {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 8px; margin-top: 14px;
+    }
+    .mini-stat {
+      background: var(--bg-card-2); border: 1px solid var(--border);
+      border-radius: 12px; padding: 10px 8px; text-align: center;
+    }
+    .mini-stat .val { font-size: 15px; font-weight: 800; }
+    .mini-stat .lbl { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+    /* Section Header */
+    .section-head {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 10px; margin: 20px 0 12px; flex-wrap: wrap;
+    }
+    .section-head h3 { margin: 0; font-size: 17px; font-weight: 800; }
+
+    .tabs { display: flex; gap: 6px; background: var(--bg-card); padding: 4px; border-radius: 12px; border: 1px solid var(--border); }
+    .tab {
+      border: none; background: transparent; color: var(--text-muted);
+      padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer;
+    }
+    .tab.active { background: var(--bg); color: var(--text); }
+
+    /* Per-Game Rallies Grid */
+    .games-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 12px;
+    }
+    .game-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 15px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .game-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .game-info { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .game-emoji {
+      width: 38px; height: 38px; border-radius: 10px;
+      background: var(--bg); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0;
+    }
+    .game-title { font-weight: 700; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .game-sub { font-size: 11px; color: var(--text-muted); }
+
+    .game-scoreline {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--bg-card-2); padding: 8px 12px; border-radius: 10px;
+      font-weight: 800; font-size: 15px;
+    }
+    .c-p1 { color: var(--p1); }
+    .c-p2 { color: var(--p2); }
+    .c-muted { color: var(--text-muted); font-size: 12px; font-weight: 600; }
+
+    .mini-tug { height: 8px; border-radius: 999px; background: var(--bg); overflow: hidden; display: flex; }
+
+    .game-foot { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+    .form-dots { display: flex; gap: 4px; align-items: center; }
+    .fdot {
+      width: 18px; height: 18px; border-radius: 5px; font-size: 10px; font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .fdot.p1 { background: var(--p1-bg); color: var(--p1); border: 1px solid rgba(56,189,248,0.4); }
+    .fdot.p2 { background: var(--p2-bg); color: var(--p2); border: 1px solid rgba(244,114,182,0.4); }
+    .fdot.tie { background: rgba(148,163,184,0.15); color: var(--text-muted); }
+
+    .add-game-card {
+      border: 2px dashed var(--border);
+      background: rgba(30, 41, 59, 0.45);
+      border-radius: 15px;
+      min-height: 156px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 8px; cursor: pointer; color: var(--text-muted); font-weight: 700; font-size: 14px;
+    }
+    .add-game-card:hover { border-color: var(--p1); color: var(--text); }
+
+    /* Match History */
+    .match-item {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      padding: 12px 0; border-bottom: 1px solid var(--border);
+    }
+    .match-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .match-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .match-meta { font-size: 12px; color: var(--text-muted); }
+    .badge {
+      padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap;
+    }
+    .badge.p1 { background: var(--p1-bg); color: var(--p1); }
+    .badge.p2 { background: var(--p2-bg); color: var(--p2); }
+    .badge.tie { background: rgba(148,163,184,0.15); color: var(--text-muted); }
+
+    /* Bottom Sticky Bar for iPhone */
+    .bottom-bar {
+      position: fixed; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-top: 1px solid var(--border);
+      padding: 10px 16px calc(var(--safe-bottom) + 8px);
+      display: flex; gap: 10px; justify-content: center; z-index: 40;
+    }
+    .bottom-bar .btn { flex: 1; max-width: 260px; }
+
+    /* Modals */
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(2, 6, 23, 0.78);
+      display: none; align-items: flex-end; justify-content: center;
+      z-index: 100; padding: 12px;
+    }
+    .modal-backdrop.open { display: flex; }
+    @media (min-width: 640px) {
+      .modal-backdrop { align-items: center; }
+    }
+    .modal {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 20px; width: 100%; max-width: 520px;
+      max-height: 88vh; overflow-y: auto; padding: 20px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    }
+    .modal-head {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .modal-head h3 { margin: 0; font-size: 18px; }
+
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: 12px; font-weight: 700; color: var(--text-muted); margin-bottom: 6px; }
+    .input, select {
+      width: 100%; background: var(--bg); color: var(--text);
+      border: 1px solid var(--border); border-radius: 12px;
+      padding: 11px 12px; font-size: 16px; min-height: 46px;
+    }
+    .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+    .winner-pills { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .wpill {
+      border: 1px solid var(--border); background: var(--bg); color: var(--text);
+      border-radius: 12px; padding: 12px 6px; text-align: center;
+      font-weight: 700; font-size: 14px; cursor: pointer; min-height: 48px;
+    }
+    .wpill.sel-p1 { background: var(--p1-bg); border-color: var(--p1); color: var(--p1); }
+    .wpill.sel-p2 { background: var(--p2-bg); border-color: var(--p2); color: var(--p2); }
+    .wpill.sel-tie { background: rgba(148,163,184,0.2); border-color: #94a3b8; }
+
+    .emoji-grid {
+      display: grid; grid-template-columns: repeat(10, 1fr); gap: 6px; margin-bottom: 8px;
+    }
+    .epick {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+      height: 36px; font-size: 18px; cursor: pointer;
+    }
+    .epick.active { border-color: var(--p1); background: var(--p1-bg); }
+
+    .summary-box {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 14px;
+      padding: 14px; margin-bottom: 12px;
+    }
+    .crown-banner {
+      text-align: center; padding: 16px; border-radius: 14px;
+      background: linear-gradient(135deg, rgba(251,191,36,0.16), rgba(244,114,182,0.12));
+      border: 1px solid rgba(251,191,36,0.4); margin-bottom: 14px;
+    }
+    .ios-steps {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 14px;
+      padding: 14px; font-size: 13px;
+    }
+    .ios-steps ol { margin: 8px 0 0; padding-left: 18px; }
+    .ios-steps li { margin-bottom: 6px; }
+    .toast {
+      position: fixed; top: calc(var(--safe-top) + 14px); left: 50%; transform: translateX(-50%);
+      background: #0f172a; border: 1px solid var(--green); color: var(--text);
+      padding: 10px 16px; border-radius: 999px; font-size: 13px; font-weight: 700;
+      z-index: 200; display: none; box-shadow: 0 10px 25px rgba(0,0,0,0.45);
+    }
+  </style>
+</head>
+<body>
+  <div id="toast" class="toast"></div>
+
+  <div class="container">
+    <!-- Top Bar -->
+    <div class="topbar">
+      <div class="brand">
+        <div class="brand-icon">🎲</div>
+        <div>
+          <h1>Tabletop Rivalry</h1>
+          <small>Couples Board Game Rally Tracker</small>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="sync-pill" onclick="openModal('syncModal')" title="Sync & iPhone Setup">
+          <span class="dot"></span>
+          <span id="roomCodeBadge">Room Sync</span>
+        </button>
+        <button class="btn btn-sm" onclick="openModal('summaryModal')">🏆 Month Recap</button>
+        <button class="btn btn-sm" onclick="openModal('playersModal')">⚙️</button>
+      </div>
+    </div>
+
+    <!-- Month Selector -->
+    <div class="month-bar">
+      <button class="btn btn-sm" onclick="changeMonth(-1)">◀ Prev</button>
+      <div class="month-title">
+        <h2 id="currentMonthLabel">Month</h2>
+        <span id="monthSubtitle">0 matches played</span>
+      </div>
+      <button class="btn btn-sm" onclick="changeMonth(1)">Next ▶</button>
+    </div>
+
+    <!-- Overall Monthly Rally Card -->
+    <div class="card">
+      <div class="players-row">
+        <div class="player-box p1" onclick="openModal('playersModal')">
+          <div class="avatar" id="p1Avatar">🧔‍♂️</div>
+          <div class="pname" id="p1Name">Me</div>
+          <div class="pscore" id="p1MonthWins">0</div>
+          <div class="pmeta" id="p1WinPct">0% win rate</div>
+        </div>
+        <div class="vs-badge" id="tiesBadge">0 Ties</div>
+        <div class="player-box p2" onclick="openModal('playersModal')">
+          <div class="avatar" id="p2Avatar">👩</div>
+          <div class="pname" id="p2Name">Girlfriend</div>
+          <div class="pscore" id="p2MonthWins">0</div>
+          <div class="pmeta" id="p2WinPct">0% win rate</div>
+        </div>
+      </div>
+
+      <div class="tug-wrap">
+        <div class="tug-labels">
+          <span id="tugLeadText">Tied Monthly Rally</span>
+          <span id="allTimeCrownText">All-Time Crowns: 0 – 0</span>
+        </div>
+        <div class="tug-bar">
+          <div class="tug-p1" id="tugP1" style="width:50%"></div>
+          <div class="tug-tie" id="tugTie" style="width:0%"></div>
+          <div class="tug-p2" id="tugP2" style="width:50%"></div>
+        </div>
+      </div>
+
+      <div class="stats-strip">
+        <div class="mini-stat">
+          <div class="val" id="statStreak">—</div>
+          <div class="lbl">Active Streak</div>
+        </div>
+        <div class="mini-stat">
+          <div class="val" id="statTopGame">—</div>
+          <div class="lbl">Most Played</div>
+        </div>
+        <div class="mini-stat">
+          <div class="val" id="statAllTime">0 – 0</div>
+          <div class="lbl">All-Time Record</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Per-Game Monthly Rallies -->
+    <div class="section-head">
+      <h3>Per-Game Monthly Rallies</h3>
+      <div class="tabs">
+        <button class="tab active" id="tabAll" onclick="setGameFilter('all')">All Shelf (7)</button>
+        <button class="tab" id="tabActive" onclick="setGameFilter('played')">Played This Month</button>
+      </div>
+    </div>
+
+    <div class="games-grid" id="gamesGrid"></div>
+
+    <!-- Recent Matches This Month -->
+    <div class="section-head">
+      <h3>Match Log (<span id="logMonthName">This Month</span>)</h3>
+      <button class="btn btn-sm" onclick="openModal('summaryModal')">End-of-Month Summary</button>
+    </div>
+    <div class="card" id="matchHistoryList"></div>
+  </div>
+
+  <!-- Sticky Bottom Bar for iPhone -->
+  <div class="bottom-bar">
+    <button class="btn" onclick="openModal('addGameModal')">🎲 + Add Game</button>
+    <button class="btn btn-primary" onclick="openLogModal()">＋ Log Match</button>
+  </div>
+
+  <!-- MODAL: Log Match -->
+  <div class="modal-backdrop" id="logModal">
+    <div class="modal">
+      <div class="modal-head">
+        <h3>Log Match Result</h3>
+        <button class="btn btn-sm" onclick="closeModal('logModal')">✕</button>
+      </div>
+      <div class="field">
+        <label>Board Game</label>
+        <div style="display:flex; gap:8px;">
+          <select id="matchGameSelect"></select>
+          <button class="btn btn-sm" type="button" onclick="toggleQuickAddGame()">+ New</button>
+        </div>
+      </div>
+      <div id="quickNewGameBox" style="display:none; background:var(--bg); padding:12px; border-radius:12px; border:1px solid var(--border); margin-bottom:14px;">
+        <div class="row-2">
+          <div class="field" style="margin:0;">
+            <label>New Game Name</label>
+            <input class="input" id="quickGameName" placeholder="e.g. Azul Duel" />
+          </div>
+          <div class="field" style="margin:0;">
+            <label>Emoji Icon</label>
+            <input class="input" id="quickGameIcon" value="🎲" maxlength="4" />
+          </div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Who Won?</label>
+        <div class="winner-pills">
+          <button type="button" class="wpill" id="winBtnP1" onclick="selectWinner('p1')">Me</button>
+          <button type="button" class="wpill" id="winBtnTie" onclick="selectWinner('tie')">Tie 🤝</button>
+          <button type="button" class="wpill" id="winBtnP2" onclick="selectWinner('p2')">Girlfriend</button>
+        </div>
+      </div>
+      <div class="row-2">
+        <div class="field">
+          <label id="scoreP1Label">Me Score (Optional)</label>
+          <input class="input" type="number" id="scoreP1" placeholder="e.g. 84" />
+        </div>
+        <div class="field">
+          <label id="scoreP2Label">Girlfriend Score (Optional)</label>
+          <input class="input" type="number" id="scoreP2" placeholder="e.g. 79" />
+        </div>
+      </div>
+      <div class="row-2">
+        <div class="field">
+          <label>Date</label>
+          <input class="input" type="date" id="matchDate" />
+        </div>
+        <div class="field">
+          <label>Note (Optional)</label>
+          <input class="input" id="matchNote" placeholder="Close comeback!" />
+        </div>
+      </div>
+      <button class="btn btn-primary" style="width:100%;" onclick="saveMatch()">Save Match Result</button>
+    </div>
+  </div>
+
+  <!-- MODAL: Add / Manage Board Games -->
+  <div class="modal-backdrop" id="addGameModal">
+    <div class="modal">
+      <div class="modal-head">
+        <h3>Add & Manage Board Games</h3>
+        <button class="btn btn-sm" onclick="closeModal('addGameModal')">✕</button>
+      </div>
+      <div class="field">
+        <label>Pick an Icon</label>
+        <div class="emoji-grid" id="emojiPicker"></div>
+      </div>
+      <div class="row-2">
+        <div class="field">
+          <label>Board Game Title</label>
+          <input class="input" id="newGameName" placeholder="e.g. Splendor Duel" />
+        </div>
+        <div class="field">
+          <label>Category / Vibe</label>
+          <input class="input" id="newGameCat" placeholder="e.g. Strategy • 30m" />
+        </div>
+      </div>
+      <button class="btn btn-primary" style="width:100%; margin-bottom:16px;" onclick="addNewGame()">Add Game to Shelf</button>
+
+      <div class="field" style="margin-bottom:0;">
+        <label>Current Game Shelf</label>
+        <div id="shelfManageList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: End-of-Month Summary -->
+  <div class="modal-backdrop" id="summaryModal">
+    <div class="modal">
+      <div class="modal-head">
+        <h3 id="sumModalTitle">End-of-Month Summary</h3>
+        <button class="btn btn-sm" onclick="closeModal('summaryModal')">✕</button>
+      </div>
+      <div id="summaryContent"></div>
+      <button class="btn btn-primary" style="width:100%;" onclick="copyRecapText()">📋 Copy Recap to Share</button>
+    </div>
+  </div>
+
+  <!-- MODAL: Players Setup -->
+  <div class="modal-backdrop" id="playersModal">
+    <div class="modal">
+      <div class="modal-head">
+        <h3>Customize Players</h3>
+        <button class="btn btn-sm" onclick="closeModal('playersModal')">✕</button>
+      </div>
+      <div class="row-2">
+        <div class="field">
+          <label>Player 1 Name</label>
+          <input class="input" id="editP1Name" />
+        </div>
+        <div class="field">
+          <label>Player 1 Emoji</label>
+          <input class="input" id="editP1Avatar" maxlength="4" />
+        </div>
+      </div>
+      <div class="row-2">
+        <div class="field">
+          <label>Player 2 Name</label>
+          <input class="input" id="editP2Name" />
+        </div>
+        <div class="field">
+          <label>Player 2 Emoji</label>
+          <input class="input" id="editP2Avatar" maxlength="4" />
+        </div>
+      </div>
+      <button class="btn btn-primary" style="width:100%;" onclick="savePlayers()">Save Players</button>
+    </div>
+  </div>
+
+  <!-- MODAL: Sync & iPhone Install Guide -->
+  <div class="modal-backdrop" id="syncModal">
+    <div class="modal">
+      <div class="modal-head">
+        <h3>📱 iPhone Install & Two-Phone Sync</h3>
+        <button class="btn btn-sm" onclick="closeModal('syncModal')">✕</button>
+      </div>
+
+      <div class="ios-steps" style="margin-bottom:14px;">
+        <strong>How to install on both iPhones:</strong>
+        <ol>
+          <li>Host this single HTML file on a free static link (e.g., <strong>Netlify Drop</strong>, <strong>GitHub Pages</strong>, or <strong>Vercel</strong>) or open the shared link in <strong>Safari</strong>.</li>
+          <li>Tap the <strong>Share button</strong> (square with upward arrow) at the bottom of Safari.</li>
+          <li>Scroll down and tap <strong>Add to Home Screen</strong> → <strong>Add</strong>. It launches full-screen like a native iOS app!</li>
+        </ol>
+      </div>
+
+      <div class="summary-box">
+        <label style="font-size:12px; color:var(--text-muted); font-weight:700;">LIVE CLOUD SYNC (OPTIONAL FIREBASE URL)</label>
+        <p style="font-size:12px; color:var(--text-muted); margin:6px 0 10px;">
+          Paste a free Firebase Realtime Database URL (e.g. <code>https://your-app.firebaseio.com</code>) and use the same Room Code on both iPhones to sync every match automatically in real time.
+        </p>
+        <div class="field">
+          <label>Shared Room Code</label>
+          <input class="input" id="syncRoomInput" placeholder="e.g. MEEPLE-2026" />
+        </div>
+        <div class="field">
+          <label>Firebase Realtime DB URL (Optional)</label>
+          <input class="input" id="syncFirebaseUrl" placeholder="https://your-project-default-rtdb.firebaseio.com" />
+        </div>
+        <div class="row-2">
+          <button class="btn btn-primary" onclick="saveSyncSettings()">Connect & Sync</button>
+          <button class="btn" onclick="copyInviteLink()">Copy Room Link</button>
+        </div>
+      </div>
+
+      <div class="row-2">
+        <button class="btn btn-sm" onclick="exportBackup()">⬇ Export JSON</button>
+        <button class="btn btn-sm" onclick="importBackupPrompt()">⬆ Import JSON</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const EMOJIS = ["🎲","♟️","🏰","🐉","🚂","🌿","🦊","💎","⚔️","🃏","🧩","🏝️","🚀","🏛️","🎨","🐝","🌊","🍄","👑","🎯"];
+    const STORAGE_KEY = "tabletop_rivalry_v3";
+
+    const now = new Date();
+    const ym = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 15);
+    const curYM = ym(now);
+    const prevYM = ym(prevDate);
+
+    const DEFAULT_STATE = {
+      players: {
+        p1: { name: "Me", avatar: "🧔‍♂️" },
+        p2: { name: "Girlfriend", avatar: "👩" }
+      },
+      games: [
+        { id: "g1", name: "Wingspan", icon: "🦅", category: "Engine Building • 45m" },
+        { id: "g2", name: "Azul", icon: "💎", category: "Tile Drafting • 35m" },
+        { id: "g3", name: "Patchwork", icon: "🧩", category: "2-Player Puzzle • 30m" },
+        { id: "g4", name: "Ticket to Ride", icon: "🚂", category: "Route Building • 45m" },
+        { id: "g5", name: "Codenames Duet", icon: "🕵️", category: "Co-op Word • 25m" },
+        { id: "g6", name: "7 Wonders Duel", icon: "🏛️", category: "Civilization • 30m" },
+        { id: "g7", name: "Cascadia", icon: "🦊", category: "Habitat Puzzle • 35m" }
+      ],
+      matches: [],
+      sync: {
+        room: "MEEPLE-" + Math.floor(1000 + Math.random() * 9000),
+        firebaseUrl: ""
+      }
+    };
+
+    let state = loadState();
+    let selectedMonth = curYM;
+    let gameFilter = "all";
+    let selectedWinner = "p1";
+    let pickedEmoji = "🎲";
+    let syncTimer = null;
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          return { ...DEFAULT_STATE, ...parsed };
+        }
+      } catch (e) {}
+      return JSON.parse(JSON.stringify(DEFAULT_STATE));
+    }
+
+    function saveState(pushCloud = true) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      if (pushCloud && state.sync.firebaseUrl && state.sync.room) {
+        pushToCloud();
+      }
+      render();
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.style.display = "block";
+      clearTimeout(t._timer);
+      t._timer = setTimeout(() => { t.style.display = "none"; }, 2600);
+    }
+
+    // URL Room Param Support
+    (function checkUrlParams() {
+      const params = new URLSearchParams(window.location.search);
+      const r = params.get("room");
+      const fb = params.get("fb");
+      if (r) state.sync.room = r.toUpperCase();
+      if (fb) state.sync.firebaseUrl = fb;
+      if (r || fb) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      }
+    })();
+
+    async function pushToCloud() {
+      const base = state.sync.firebaseUrl.replace(/\/$/, "");
+      if (!base) return;
+      try {
+        await fetch(`${base}/rivalry/${encodeURIComponent(state.sync.room)}.json`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            players: state.players,
+            games: state.games,
+            matches: state.matches,
+            updatedAt: Date.now()
+          })
+        });
+      } catch (e) {}
+    }
+
+    async function pullFromCloud() {
+      const base = state.sync.firebaseUrl.replace(/\/$/, "");
+      if (!base || !state.sync.room) return;
+      try {
+        const res = await fetch(`${base}/rivalry/${encodeURIComponent(state.sync.room)}.json`);
+        const data = await res.json();
+        if (data && data.games && data.matches) {
+          state.players = data.players || state.players;
+          state.games = data.games;
+          state.matches = data.matches;
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+          render();
+        }
+      } catch (e) {}
+    }
+
+    function startCloudPolling() {
+      clearInterval(syncTimer);
+      if (state.sync.firebaseUrl) {
+        pullFromCloud();
+        syncTimer = setInterval(pullFromCloud, 5000);
+      }
+    }
+
+    function formatMonthLabel(ymStr) {
+      const [y, m] = ymStr.split("-").map(Number);
+      return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+    }
+
+    function changeMonth(delta) {
+      const [y, m] = selectedMonth.split("-").map(Number);
+      const d = new Date(y, m - 1 + delta, 1);
+      selectedMonth = ym(d);
+      render();
+    }
+
+    function setGameFilter(f) {
+      gameFilter = f;
+      document.getElementById("tabAll").classList.toggle("active", f === "all");
+      document.getElementById("tabActive").classList.toggle("active", f === "played");
+      render();
+    }
+
+    function getMonthMatches(ymStr) {
+      return state.matches
+        .filter(m => m.date && m.date.startsWith(ymStr))
+        .sort((a, b) => b.date.localeCompare(a.date));
+    }
+
+    function computeAllTimeCrowns() {
+      const months = [...new Set(state.matches.map(m => m.date.slice(0, 7)))];
+      let c1 = 0, c2 = 0;
+      months.forEach(m => {
+        if (m === curYM) return;
+        const ms = getMonthMatches(m);
+        const w1 = ms.filter(x => x.winner === "p1").length;
+        const w2 = ms.filter(x => x.winner === "p2").length;
+        if (w1 > w2) c1++;
+        else if (w2 > w1) c2++;
+      });
+      return { c1, c2 };
+    }
+
+    function render() {
+      const p1 = state.players.p1;
+      const p2 = state.players.p2;
+      const monthMatches = getMonthMatches(selectedMonth);
+
+      document.getElementById("roomCodeBadge").textContent = state.sync.firebaseUrl
+        ? `Live • ${state.sync.room}`
+        : `Room ${state.sync.room}`;
+
+      document.getElementById("currentMonthLabel").textContent = formatMonthLabel(selectedMonth);
+      document.getElementById("logMonthName").textContent = formatMonthLabel(selectedMonth);
+      document.getElementById("monthSubtitle").textContent = `${monthMatches.length} match${monthMatches.length === 1 ? "" : "es"} logged`;
+
+      document.getElementById("p1Avatar").textContent = p1.avatar;
+      document.getElementById("p1Name").textContent = p1.name;
+      document.getElementById("p2Avatar").textContent = p2.avatar;
+      document.getElementById("p2Name").textContent = p2.name;
+
+      const w1 = monthMatches.filter(m => m.winner === "p1").length;
+      const w2 = monthMatches.filter(m => m.winner === "p2").length;
+      const ties = monthMatches.filter(m => m.winner === "tie").length;
+      const total = monthMatches.length;
+
+      document.getElementById("p1MonthWins").textContent = w1;
+      document.getElementById("p2MonthWins").textContent = w2;
+      document.getElementById("tiesBadge").textContent = `${ties} Tie${ties === 1 ? "" : "s"}`;
+      document.getElementById("p1WinPct").textContent = total ? `${Math.round((w1 / total) * 100)}% win rate` : "0% win rate";
+      document.getElementById("p2WinPct").textContent = total ? `${Math.round((w2 / total) * 100)}% win rate` : "0% win rate";
+
+      if (w1 > w2) document.getElementById("tugLeadText").textContent = `${p1.name} leads by ${w1 - w2}`;
+      else if (w2 > w1) document.getElementById("tugLeadText").textContent = `${p2.name} leads by ${w2 - w1}`;
+      else document.getElementById("tugLeadText").textContent = "Tied Monthly Rally";
+
+      const crowns = computeAllTimeCrowns();
+      document.getElementById("allTimeCrownText").textContent = `Monthly Crowns: ${crowns.c1} – ${crowns.c2}`;
+
+      if (total === 0) {
+        document.getElementById("tugP1").style.width = "50%";
+        document.getElementById("tugTie").style.width = "0%";
+        document.getElementById("tugP2").style.width = "50%";
+      } else {
+        document.getElementById("tugP1").style.width = `${(w1 / total) * 100}%`;
+        document.getElementById("tugTie").style.width = `${(ties / total) * 100}%`;
+        document.getElementById("tugP2").style.width = `${(w2 / total) * 100}%`;
+      }
+
+      // Active Streak
+      let streakStr = "—";
+      const decisive = monthMatches.filter(m => m.winner !== "tie");
+      if (decisive.length > 0) {
+        const who = decisive[0].winner;
+        let count = 0;
+        for (const m of decisive) {
+          if (m.winner === who) count++;
+          else break;
+        }
+        streakStr = `${who === "p1" ? p1.name : p2.name} (${count}W)`;
+      }
+      document.getElementById("statStreak").textContent = streakStr;
+
+      // Top Game
+      const counts = {};
+      monthMatches.forEach(m => { counts[m.gameId] = (counts[m.gameId] || 0) + 1; });
+      const topEntry = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+      const topGame = topEntry ? state.games.find(g => g.id === topEntry[0]) : null;
+      document.getElementById("statTopGame").textContent = topGame ? `${topGame.icon} ${topGame.name}` : "—";
+
+      const allW1 = state.matches.filter(m => m.winner === "p1").length;
+      const allW2 = state.matches.filter(m => m.winner === "p2").length;
+      document.getElementById("statAllTime").textContent = `${allW1} – ${allW2}`;
+
+      // Per-Game Rallies Grid
+      document.getElementById("tabAll").textContent = `All Shelf (${state.games.length})`;
+      const grid = document.getElementById("gamesGrid");
+      grid.innerHTML = "";
+
+      state.games.forEach(game => {
+        const gMatches = monthMatches.filter(m => m.gameId === game.id);
+        if (gameFilter === "played" && gMatches.length === 0) return;
+
+        const gw1 = gMatches.filter(m => m.winner === "p1").length;
+        const gw2 = gMatches.filter(m => m.winner === "p2").length;
+        const gTotal = gMatches.length;
+        const p1Pct = gTotal ? (gw1 / gTotal) * 100 : 50;
+        const p2Pct = gTotal ? (gw2 / gTotal) * 100 : 50;
+
+        let leaderLabel = gTotal === 0 ? "Unplayed this month" : (gw1 > gw2 ? `${p1.name} +${gw1 - gw2}` : gw2 > gw1 ? `${p2.name} +${gw2 - gw1}` : "Tied");
+
+        const recent5 = gMatches.slice(0, 5).reverse().map(m => {
+          const lbl = m.winner === "p1" ? p1.name[0] : m.winner === "p2" ? p2.name[0] : "T";
+          return `<span class="fdot ${m.winner}">${lbl}</span>`;
+        }).join("");
+
+        const card = document.createElement("div");
+        card.className = "game-card";
+        card.innerHTML = `
+          <div>
+            <div class="game-top">
+              <div class="game-info">
+                <div class="game-emoji">${game.icon}</div>
+                <div style="min-width:0;">
+                  <div class="game-title">${game.name}</div>
+                  <div class="game-sub">${game.category || "Board Game"}</div>
+                </div>
+              </div>
+              <button class="btn btn-sm" onclick="openLogModal('${game.id}')">+ Log</button>
+            </div>
+            <div class="game-scoreline" style="margin-top:10px;">
+              <span class="c-p1">${p1.name}: ${gw1}</span>
+              <span class="c-muted">${leaderLabel}</span>
+              <span class="c-p2">${gw2} :${p2.name}</span>
+            </div>
+            <div class="mini-tug" style="margin-top:8px;">
+              <div class="tug-p1" style="width:${p1Pct}%"></div>
+              <div class="tug-p2" style="width:${p2Pct}%"></div>
+            </div>
+          </div>
+          <div class="game-foot">
+            <div class="form-dots">${recent5 || '<span class="game-sub">No plays yet</span>'}</div>
+            <span class="game-sub">${gTotal} play${gTotal === 1 ? "" : "s"}</span>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+
+      const addCard = document.createElement("div");
+      addCard.className = "add-game-card";
+      addCard.onclick = () => openModal("addGameModal");
+      addCard.innerHTML = `<div style="font-size:26px;">＋</div><div>Add New Board Game</div>`;
+      grid.appendChild(addCard);
+
+      // Match Log
+      const logBox = document.getElementById("matchHistoryList");
+      if (monthMatches.length === 0) {
+        logBox.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:16px 0;">No matches logged in ${formatMonthLabel(selectedMonth)} yet. Tap <strong>+ Log Match</strong> below!</div>`;
+      } else {
+        logBox.innerHTML = monthMatches.map(m => {
+          const g = state.games.find(x => x.id === m.gameId) || { name: "Board Game", icon: "🎲" };
+          const winText = m.winner === "p1" ? `${p1.avatar} ${p1.name} Won` : m.winner === "p2" ? `${p2.avatar} ${p2.name} Won` : "🤝 Tie Game";
+          const scoreStr = (m.p1Score !== null && m.p2Score !== null) ? ` • ${m.p1Score}–${m.p2Score}` : "";
+          const noteStr = m.note ? ` • “${m.note}”` : "";
+          return `
+            <div class="match-item">
+              <div class="match-left">
+                <div class="game-emoji">${g.icon}</div>
+                <div>
+                  <div style="font-weight:700; font-size:14px;">${g.name}</div>
+                  <div class="match-meta">${m.date}${scoreStr}${noteStr}</div>
+                </div>
+              </div>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span class="badge ${m.winner}">${winText}</span>
+                <button class="btn btn-sm btn-danger" onclick="deleteMatch('${m.id}')" title="Delete">✕</button>
+              </div>
+            </div>
+          `;
+        }).join("");
+      }
+    }
+
+    // Modal Helpers
+    function openModal(id) {
+      if (id === "addGameModal") renderAddGameModal();
+      if (id === "summaryModal") renderSummaryModal();
+      if (id === "playersModal") {
+        document.getElementById("editP1Name").value = state.players.p1.name;
+        document.getElementById("editP1Avatar").value = state.players.p1.avatar;
+        document.getElementById("editP2Name").value = state.players.p2.name;
+        document.getElementById("editP2Avatar").value = state.players.p2.avatar;
+      }
+      if (id === "syncModal") {
+        document.getElementById("syncRoomInput").value = state.sync.room;
+        document.getElementById("syncFirebaseUrl").value = state.sync.firebaseUrl || "";
+      }
+      document.getElementById(id).classList.add("open");
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.remove("open");
+    }
+
+    function openLogModal(preselectGameId) {
+      const sel = document.getElementById("matchGameSelect");
+      sel.innerHTML = state.games.map(g => `<option value="${g.id}">${g.icon} ${g.name}</option>`).join("");
+      if (preselectGameId) sel.value = preselectGameId;
+
+      document.getElementById("quickNewGameBox").style.display = "none";
+      document.getElementById("quickGameName").value = "";
+      document.getElementById("winBtnP1").textContent = `${state.players.p1.avatar} ${state.players.p1.name}`;
+      document.getElementById("winBtnP2").textContent = `${state.players.p2.avatar} ${state.players.p2.name}`;
+      document.getElementById("scoreP1Label").textContent = `${state.players.p1.name} Score (Opt.)`;
+      document.getElementById("scoreP2Label").textContent = `${state.players.p2.name} Score (Opt.)`;
+      document.getElementById("scoreP1").value = "";
+      document.getElementById("scoreP2").value = "";
+      document.getElementById("matchNote").value = "";
+      document.getElementById("matchDate").value = new Date().toISOString().slice(0, 10);
+      selectWinner("p1");
+      openModal("logModal");
+    }
+
+    function toggleQuickAddGame() {
+      const box = document.getElementById("quickNewGameBox");
+      box.style.display = box.style.display === "none" ? "block" : "none";
+    }
+
+    function selectWinner(w) {
+      selectedWinner = w;
+      document.getElementById("winBtnP1").className = "wpill" + (w === "p1" ? " sel-p1" : "");
+      document.getElementById("winBtnTie").className = "wpill" + (w === "tie" ? " sel-tie" : "");
+      document.getElementById("winBtnP2").className = "wpill" + (w === "p2" ? " sel-p2" : "");
+    }
+
+    function saveMatch() {
+      let gameId = document.getElementById("matchGameSelect").value;
+      const quickName = document.getElementById("quickGameName").value.trim();
+      if (document.getElementById("quickNewGameBox").style.display !== "none" && quickName) {
+        const newId = "g" + Date.now();
+        state.games.push({
+          id: newId,
+          name: quickName,
+          icon: document.getElementById("quickGameIcon").value.trim() || "🎲",
+          category: "Custom Game"
+        });
+        gameId = newId;
+      }
+
+      const s1Raw = document.getElementById("scoreP1").value;
+      const s2Raw = document.getElementById("scoreP2").value;
+      const dateVal = document.getElementById("matchDate").value || new Date().toISOString().slice(0, 10);
+
+      state.matches.push({
+        id: "m" + Date.now(),
+        gameId,
+        winner: selectedWinner,
+        p1Score: s1Raw === "" ? null : Number(s1Raw),
+        p2Score: s2Raw === "" ? null : Number(s2Raw),
+        date: dateVal,
+        note: document.getElementById("matchNote").value.trim()
+      });
+
+      selectedMonth = dateVal.slice(0, 7);
+      saveState();
+      closeModal("logModal");
+      showToast("Match logged!");
+    }
+
+    function deleteMatch(id) {
+      state.matches = state.matches.filter(m => m.id !== id);
+      saveState();
+      showToast("Match removed");
+    }
+
+    function renderAddGameModal() {
+      const picker = document.getElementById("emojiPicker");
+      picker.innerHTML = EMOJIS.map(e => `<button type="button" class="epick ${e === pickedEmoji ? "active" : ""}" onclick="pickEmoji('${e}')">${e}</button>`).join("");
+
+      const list = document.getElementById("shelfManageList");
+      list.innerHTML = state.games.map(g => {
+        const count = state.matches.filter(m => m.gameId === g.id).length;
+        return `
+          <div class="match-item">
+            <div class="match-left">
+              <div class="game-emoji">${g.icon}</div>
+              <div>
+                <div style="font-weight:700; font-size:14px;">${g.name}</div>
+                <div class="match-meta">${g.category || "Board Game"} • ${count} match${count === 1 ? "" : "es"}</div>
+              </div>
+            </div>
+            <button class="btn btn-sm btn-danger" onclick="removeGame('${g.id}')">Remove</button>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function pickEmoji(e) {
+      pickedEmoji = e;
+      renderAddGameModal();
+    }
+
+    function addNewGame() {
+      const name = document.getElementById("newGameName").value.trim();
+      if (!name) return showToast("Enter a board game name");
+      if (state.games.some(g => g.name.toLowerCase() === name.toLowerCase())) {
+        return showToast("That game is already on your shelf!");
+      }
+      state.games.push({
+        id: "g" + Date.now(),
+        name,
+        icon: pickedEmoji,
+        category: document.getElementById("newGameCat").value.trim() || "Board Game"
+      });
+      document.getElementById("newGameName").value = "";
+      document.getElementById("newGameCat").value = "";
+      saveState();
+      renderAddGameModal();
+      showToast(`${pickedEmoji} ${name} added!`);
+    }
+
+    function removeGame(id) {
+      if (state.games.length <= 1) return showToast("Keep at least 1 game on your shelf");
+      state.games = state.games.filter(g => g.id !== id);
+      saveState();
+      renderAddGameModal();
+      showToast("Removed from shelf");
+    }
+
+    function savePlayers() {
+      state.players.p1.name = document.getElementById("editP1Name").value.trim() || "Me";
+      state.players.p1.avatar = document.getElementById("editP1Avatar").value.trim() || "🧔‍♂️";
+      state.players.p2.name = document.getElementById("editP2Name").value.trim() || "Girlfriend";
+      state.players.p2.avatar = document.getElementById("editP2Avatar").value.trim() || "👩";
+      saveState();
+      closeModal("playersModal");
+      showToast("Players updated!");
+    }
+
+    let lastRecapText = "";
+    function renderSummaryModal() {
+      const p1 = state.players.p1;
+      const p2 = state.players.p2;
+      const ms = getMonthMatches(selectedMonth);
+      const label = formatMonthLabel(selectedMonth);
+      document.getElementById("sumModalTitle").textContent = `${label} Summary`;
+
+      const w1 = ms.filter(m => m.winner === "p1").length;
+      const w2 = ms.filter(m => m.winner === "p2").length;
+      const ties = ms.filter(m => m.winner === "tie").length;
+
+      let champTitle = "🤝 Co-Champions (Tied Month)";
+      let narrative = `Across ${ms.length} matches in ${label}, ${p1.name} and ${p2.name} battled to an exact ${w1}–${w2} stalemate.`;
+      if (w1 > w2) {
+        champTitle = `👑 ${p1.avatar} ${p1.name} — Monthly Champion`;
+        narrative = `${p1.name} claimed the ${label} crown with a ${w1}–${w2}${ties ? ` (${ties} ties)` : ""} rally victory over ${p2.name}.`;
+      } else if (w2 > w1) {
+        champTitle = `👑 ${p2.avatar} ${p2.name} — Monthly Champion`;
+        narrative = `${p2.name} claimed the ${label} crown with a ${w2}–${w1}${ties ? ` (${ties} ties)` : ""} rally victory over ${p1.name}.`;
+      }
+
+      const breakdownRows = state.games.map(g => {
+        const gm = ms.filter(m => m.gameId === g.id);
+        if (!gm.length) return "";
+        const gw1 = gm.filter(m => m.winner === "p1").length;
+        const gw2 = gm.filter(m => m.winner === "p2").length;
+        const gWinner = gw1 > gw2 ? p1.name : gw2 > gw1 ? p2.name : "Tied";
+        return `<div class="match-item" style="padding:8px 0;">
+          <span>${g.icon} <strong>${g.name}</strong></span>
+          <span class="match-meta">${gw1}–${gw2} (${gWinner})</span>
+        </div>`;
+      }).filter(Boolean).join("");
+
+      lastRecapText = `🎲 Tabletop Rivalry — ${label} Recap
+${champTitle}
+Overall Rally: ${p1.name} ${w1} – ${w2} ${p2.name}
+${narrative}`;
+
+      document.getElementById("summaryContent").innerHTML = `
+        <div class="crown-banner">
+          <div style="font-size:20px; font-weight:900; color:var(--gold);">${champTitle}</div>
+          <div style="font-size:14px; margin-top:6px;">${narrative}</div>
+        </div>
+        <div class="summary-box">
+          <div style="font-size:12px; font-weight:800; color:var(--text-muted); margin-bottom:6px;">PER-GAME RALLY BREAKDOWN</div>
+          ${breakdownRows || '<div class="match-meta">No games played in this month yet.</div>'}
+        </div>
+      `;
+    }
+
+    function copyRecapText() {
+      navigator.clipboard?.writeText(lastRecapText);
+      showToast("Recap copied to clipboard!");
+    }
+
+    function saveSyncSettings() {
+      state.sync.room = (document.getElementById("syncRoomInput").value.trim() || state.sync.room).toUpperCase();
+      state.sync.firebaseUrl = document.getElementById("syncFirebaseUrl").value.trim();
+      saveState();
+      startCloudPolling();
+      closeModal("syncModal");
+      showToast("Sync settings saved!");
+    }
+
+    function copyInviteLink() {
+      const url = new URL(window.location.href);
+      url.searchParams.set("room", state.sync.room);
+      if (state.sync.firebaseUrl) url.searchParams.set("fb", state.sync.firebaseUrl);
+      navigator.clipboard?.writeText(url.toString());
+      showToast("Invite link copied!");
+    }
+
+    function exportBackup() {
+      const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `tabletop-rivalry-${state.sync.room}.json`;
+      a.click();
+    }
+
+    function importBackupPrompt() {
+      const inp = document.createElement("input");
+      inp.type = "file";
+      inp.accept = ".json";
+      inp.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const parsed = JSON.parse(reader.result);
+            state = { ...state, ...parsed };
+            saveState();
+            showToast("Backup imported!");
+          } catch (err) {
+            showToast("Invalid JSON file");
+          }
+        };
+        reader.readAsText(file);
+      };
+      inp.click();
+    }
+
+    startCloudPolling();
+    render();
+  </script>
+</body>
+</html>
