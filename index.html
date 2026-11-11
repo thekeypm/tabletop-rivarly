@@ -421,15 +421,14 @@
       </div>
     </div>
 
-    <!-- Per-Game Monthly Rallies -->
+    <!-- Games Shelf -->
     <div class="section-head">
-      <h3>Per-Game Monthly Rallies</h3>
+      <h3>Games shelf</h3>
       <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
         <div class="tabs">
           <button class="tab active" id="tabAll" onclick="setGameFilter('all')">All Shelf (7)</button>
           <button class="tab" id="tabActive" onclick="setGameFilter('played')">Played This Month</button>
         </div>
-        <button class="btn btn-sm" onclick="openModal('addGameModal')">Manage Shelf</button>
       </div>
     </div>
 
@@ -443,8 +442,9 @@
       <div class="card" id="matchHistoryList"></div>
     </div>
 
-    <!-- Bottom Utility Actions: Month Recap above Settings -->
+    <!-- Bottom Utility Actions: Manage Shelf above Month Recap above Settings -->
     <div style="display:flex; flex-direction:column; gap:10px; margin-top:20px;">
+      <button class="btn" style="width:100%;" onclick="openModal('addGameModal')">🎲 Manage Shelf</button>
       <button class="btn" style="width:100%;" onclick="openModal('summaryModal')">🏆 Month Recap</button>
       <button class="btn" style="width:100%;" onclick="openModal('playersModal')">⚙️ Settings</button>
     </div>
