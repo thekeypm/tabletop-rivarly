@@ -728,27 +728,30 @@
       } catch (e) {}
     }
 
-    async function pullFromCloud() {
-      const base = state.sync.firebaseUrl.replace(/\/$/, "");
+    async function pullFromCloud(forceNotify = false) {
+      const base = (state.sync.firebaseUrl || "").replace(/\/$/, "");
       if (!base || !state.sync.room) return;
       try {
-        const res = await fetch(`${base}/rivalry/${encodeURIComponent(state.sync.room)}.json`);
+        const res = await fetch(`${base}/rivalry/${encodeURIComponent(state.sync.room)}.json?t=${Date.now()}`);
         const data = await res.json();
-        if (data && data.games && data.matches) {
-          state.players = data.players || state.players;
-          state.games = data.games;
-          state.matches = data.matches;
+        if (data && typeof data === "object") {
+          if (data.players) state.players = data.players;
+          if (Array.isArray(data.games)) state.games = data.games;
+          state.matches = Array.isArray(data.matches) ? data.matches : [];
           localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
           render();
+          if (forceNotify) showToast("Synced from cloud!");
         }
-      } catch (e) {}
+      } catch (e) {
+        if (forceNotify) showToast("Sync error — check Firebase URL");
+      }
     }
 
     function startCloudPolling() {
       clearInterval(syncTimer);
       if (state.sync.firebaseUrl) {
         pullFromCloud();
-        syncTimer = setInterval(pullFromCloud, 5000);
+        syncTimer = setInterval(() => pullFromCloud(false), 5000);
       }
     }
 
@@ -1199,13 +1202,14 @@ ${narrative}`;
       showToast("Recap copied to clipboard!");
     }
 
-    function saveSyncSettings() {
+    async function saveSyncSettings() {
       state.sync.room = (document.getElementById("syncRoomInput").value.trim() || state.sync.room).toUpperCase();
       state.sync.firebaseUrl = document.getElementById("syncFirebaseUrl").value.trim();
-      saveState();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      await pullFromCloud(true);
+      await pushToCloud();
       startCloudPolling();
       closeModal("syncModal");
-      showToast("Sync settings saved!");
     }
 
     function copyInviteLink() {
